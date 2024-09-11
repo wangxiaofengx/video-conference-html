@@ -224,6 +224,10 @@ class Group {
 			that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
 		}
 
+		// if(that.localStream){
+		// 	connect.addStream(that.localStream)
+		// }
+
 		// connect.ontrack = (event) => {
 		// 	console.log('receive track', event.track);
 		// 	const remoteStream = new MediaStream();
@@ -235,6 +239,7 @@ class Group {
 		// }
 
 		connect.onremovestream = (event) => {
+			console.log('remove stream', event.stream);
 		}
 		connect.ondatachannel = (event) => {
 			const receiveChannel = event.channel;

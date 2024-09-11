@@ -16,11 +16,11 @@ const sendMessage = (text) => {
 }
 
 const sharedScreen = () => {
-    navigator.mediaDevices.getUserMedia({video: true, audio: false})
-        // navigator.mediaDevices.getDisplayMedia({ video: true })
+    // navigator.mediaDevices.getUserMedia({video: true, audio: false})
+        navigator.mediaDevices.getDisplayMedia({ video: true })
         .then(stream => {
             group.shareScreen(stream)
-            sharedScreenVideo.value.srcObject = stream;
+            // sharedScreenVideo.value.srcObject = stream;
         }).catch(error => console.error('Error sharing screen: ', error))
 }
 
@@ -44,8 +44,15 @@ group.onMessage((message) => {
 group.onSharedScreen(stream => {
     sharedScreenVideo.value.srcObject = stream;
 })
-
 group.start();
+// navigator.mediaDevices.getDisplayMedia({ video: true }).then(stream => {
+//   group.localStream = stream;
+//   group.start();
+// }).catch(error => {
+//   console.error('Error getting local stream: ', error)
+//   group.start();
+// })
+
 </script>
 
 <template>
