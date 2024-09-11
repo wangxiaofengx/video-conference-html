@@ -166,7 +166,9 @@ class Group {
 		this.otherUsers.forEach(user => {
 			let connect = user.getConnect();
 			connect.addStream(stream);
-
+			// stream.getTracks().forEach(track => {
+			// 	connect.addTrack(track, stream);
+			// })
 			connect.createOffer().then(function (sessionDescription) {
 				connect.setLocalDescription(sessionDescription);
 				let message = new Message();
@@ -176,9 +178,7 @@ class Group {
 				that._socket.emit(message);
 			});
 
-			// stream.getTracks().forEach(track => {
-			// 	connect.addTrack(track, stream);
-			// })
+
 		})
 	}
 
@@ -224,15 +224,15 @@ class Group {
 			that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
 		}
 
-		connect.ontrack = (event) => {
-			console.log('receive track', event.track);
-			const remoteStream = new MediaStream();
-			// 将轨道添加到远程流
-			event.streams[0].getTracks().forEach(track => {
-				remoteStream.addTrack(track);
-			});
-			that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
-		}
+		// connect.ontrack = (event) => {
+		// 	console.log('receive track', event.track);
+		// 	const remoteStream = new MediaStream();
+		// 	// 将轨道添加到远程流
+		// 	event.streams[0].getTracks().forEach(track => {
+		// 		remoteStream.addTrack(track);
+		// 	});
+		// 	that.sharedScreenEventListener && that.sharedScreenEventListener(remoteStream);
+		// }
 
 		connect.onremovestream = (event) => {
 		}

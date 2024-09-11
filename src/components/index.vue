@@ -16,10 +16,11 @@ const sendMessage = (text) => {
 }
 
 const sharedScreen = () => {
-    // navigator.mediaDevices.getUserMedia({video: true, audio: true})
-        navigator.mediaDevices.getDisplayMedia({ video: true })
+    navigator.mediaDevices.getUserMedia({video: true, audio: false})
+        // navigator.mediaDevices.getDisplayMedia({ video: true })
         .then(stream => {
             group.shareScreen(stream)
+            sharedScreenVideo.value.srcObject = stream;
         }).catch(error => console.error('Error sharing screen: ', error))
 }
 
@@ -60,7 +61,7 @@ group.start();
     <div v-for="(message, index) in messages">
         {{ message }}
     </div>
-    <video autoplay playsinline ref="sharedScreenVideo"></video>
+    <video autoplay="true" playsinline="true" ref="sharedScreenVideo"></video>
 </template>
 
 <style scoped lang="scss">
