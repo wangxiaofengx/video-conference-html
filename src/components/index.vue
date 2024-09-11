@@ -7,11 +7,20 @@ const group = new Group('online');
 const otherUsers = ref([]);
 const messages = ref([]);
 const sendText = ref('');
+const sharedScreenVideo = ref(null);
 
 const sendMessage = (text) => {
     messages.value.push(sendText.value);
     group.sendText(sendText.value)
     sendText.value = ''
+}
+
+const sharedScreen = () => {
+    // navigator.mediaDevices.getUserMedia({video: true, audio: true})
+        navigator.mediaDevices.getDisplayMedia({ video: true })
+        .then(stream => {
+            group.shareScreen(stream)
+        }).catch(error => console.error('Error sharing screen: ', error))
 }
 
 group.onConnect((userInfo) => {
@@ -31,6 +40,10 @@ group.onMessage((message) => {
     messages.value.push(message.getData());
 })
 
+group.onSharedScreen(stream => {
+    sharedScreenVideo.value.srcObject = stream;
+})
+
 group.start();
 </script>
 
@@ -38,6 +51,7 @@ group.start();
     <div>
         <input v-model="sendText" placeholder="Enter message">
         <button @click="sendMessage">Send</button>
+        <button @click="sharedScreen">Shared screen</button>
     </div>
     <div v-for="(user, index) in otherUsers">
         {{ user.name }}:{{ user.id }}
@@ -46,6 +60,7 @@ group.start();
     <div v-for="(message, index) in messages">
         {{ message }}
     </div>
+    <video autoplay playsinline ref="sharedScreenVideo"></video>
 </template>
 
 <style scoped lang="scss">

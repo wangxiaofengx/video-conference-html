@@ -11,8 +11,8 @@ class Group {
 
 	start() {
 		const that = this;
-		// const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + room;
-		const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + 'localhost:9900' + '/video/conference/websocket/' + this.channel;
+		const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
+		// const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + '192.168.8.75:9900' + '/video/conference/websocket/' + this.channel;
 		let socket = this._socket = new WebSocket(url);
 
 		socket.on = function (name, callback) {
@@ -53,6 +53,11 @@ class Group {
 			const userInfo = new UserInfo(m.getData());
 			this.otherUsers.push(userInfo);
 
+			let connect = that.createConnection();
+			let rtcDataChannel = connect.createDataChannel('sendDataChannel', null);
+			userInfo.setDataChannel(rtcDataChannel);
+			userInfo.setConnect(connect);
+
 			let message = new Message();
 			message.setType('receive');
 			message.setData(that.getCurrentUser());
@@ -87,10 +92,7 @@ class Group {
 			const sender = message.getSender();
 			let userInfo = that.getUserInfo(sender);
 			if (data.type === 'offer') {
-				let connect = that.createConnection();
-				let rtcDataChannel = connect.createDataChannel('sendDataChannel', null);
-				userInfo.setDataChannel(rtcDataChannel);
-				userInfo.setConnect(connect);
+				const connect = userInfo.getConnect();
 				connect.setRemoteDescription(new RTCSessionDescription(data));
 				connect.createAnswer().then(function (sessionDescription) {
 					connect.setLocalDescription(sessionDescription);
@@ -142,6 +144,11 @@ class Group {
 		return this;
 	}
 
+	onSharedScreen(event) {
+		this.sharedScreenEventListener = event;
+		return this;
+	}
+
 	sendText(text) {
 		let message = new Message();
 		message.setType('text');
@@ -152,6 +159,27 @@ class Group {
 				dataChannel.send(JSON.stringify(message));
 			}
 		});
+	}
+
+	shareScreen(stream) {
+		const that = this;
+		this.otherUsers.forEach(user => {
+			let connect = user.getConnect();
+			connect.addStream(stream);
+
+			connect.createOffer().then(function (sessionDescription) {
+				connect.setLocalDescription(sessionDescription);
+				let message = new Message();
+				message.setType('rtc');
+				message.setData(sessionDescription);
+				message.setReceiver(user.getId());
+				that._socket.emit(message);
+			});
+
+			// stream.getTracks().forEach(track => {
+			// 	connect.addTrack(track, stream);
+			// })
+		})
 	}
 
 	getCurrentUser() {
@@ -193,14 +221,26 @@ class Group {
 			}
 		}
 		connect.onaddstream = (event) => {
+			that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
 		}
+
+		connect.ontrack = (event) => {
+			console.log('receive track', event.track);
+			const remoteStream = new MediaStream();
+			// 将轨道添加到远程流
+			event.streams[0].getTracks().forEach(track => {
+				remoteStream.addTrack(track);
+			});
+			that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
+		}
+
 		connect.onremovestream = (event) => {
 		}
 		connect.ondatachannel = (event) => {
 			const receiveChannel = event.channel;
 			receiveChannel.onmessage = (event) => {
 				console.log('receive data channel message', event.data);
-				this.messageEventListener&&this.messageEventListener(new Message(JSON.parse(event.data)))
+				that.messageEventListener && that.messageEventListener(new Message(JSON.parse(event.data)))
 			}
 		}
 		return connect;
