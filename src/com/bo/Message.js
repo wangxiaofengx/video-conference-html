@@ -1,6 +1,7 @@
 class Message {
 
 	constructor(options) {
+		this.sequence = null;
 		this.type = null;
 		this.data = null;
 		this.sender = null;
@@ -35,23 +36,23 @@ class Message {
 		return this;
 	}
 
-	getData(){
+	getData() {
 		return this.data;
 	}
 
-	getType(){
+	getType() {
 		return this.type;
 	}
 
-	getSender(){
+	getSender() {
 		return this.sender;
 	}
 
-	getReceiver(){
+	getReceiver() {
 		return this.receiver;
 	}
 
-	getTimestamp(){
+	getTimestamp() {
 		return this.timestamp;
 	}
 

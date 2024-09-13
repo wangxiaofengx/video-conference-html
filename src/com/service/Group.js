@@ -25,6 +25,7 @@ class Group {
 		socket.onmessage = function (event) {
 			const data = JSON.parse(event.data);
 			let message = new Message(data);
+			that.treckEventListener && that.treckEventListener(message);
 			console.log(message)
 			this.event[message.getType()] && this.event[message.getType()].call(this, message);
 		};
@@ -124,6 +125,11 @@ class Group {
 		})
 	}
 
+	onTrack(event) {
+		this.treckEventListener = event;
+		return this;
+	}
+
 	onConnect(event) {
 		this.connectEventListener = event;
 		return this;
@@ -165,10 +171,11 @@ class Group {
 		const that = this;
 		this.otherUsers.forEach(user => {
 			let connect = user.getConnect();
-			connect.addStream(stream);
-			// stream.getTracks().forEach(track => {
-			// 	connect.addTrack(track, stream);
-			// })
+			// connect.addStream(stream);
+			stream.getTracks().forEach(track => {
+				connect.addTrack(track, stream);
+			})
+
 			connect.createOffer().then(function (sessionDescription) {
 				connect.setLocalDescription(sessionDescription);
 				let message = new Message();
@@ -220,23 +227,27 @@ class Group {
 				console.log('End of candidates.');
 			}
 		}
-		connect.onaddstream = (event) => {
-			that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
-		}
+		// connect.onaddstream = (event) => {
+		// 	that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
+		// }
 
 		// if(that.localStream){
 		// 	connect.addStream(that.localStream)
 		// }
 
-		// connect.ontrack = (event) => {
-		// 	console.log('receive track', event.track);
-		// 	const remoteStream = new MediaStream();
-		// 	// 将轨道添加到远程流
-		// 	event.streams[0].getTracks().forEach(track => {
-		// 		remoteStream.addTrack(track);
-		// 	});
-		// 	that.sharedScreenEventListener && that.sharedScreenEventListener(remoteStream);
-		// }
+		connect.ontrack = (event) => {
+			console.log('receive track', event.track);
+			const remoteStream = new MediaStream();
+			// 将轨道添加到远程流
+			event.streams[0].getTracks().forEach(track => {
+				remoteStream.addTrack(track);
+			});
+			that.sharedScreenEventListener && that.sharedScreenEventListener(remoteStream);
+		}
+
+		connect.onremovetrack = (event) => {
+			console.log('remove track', event.track);
+		}
 
 		connect.onremovestream = (event) => {
 			console.log('remove stream', event.stream);

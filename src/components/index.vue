@@ -7,7 +7,7 @@ const group = new Group('online');
 const otherUsers = ref([]);
 const messages = ref([]);
 const sendText = ref('');
-const sharedScreenVideo = ref(null);
+const streams = ref([]);
 
 const sendMessage = (text) => {
     messages.value.push(sendText.value);
@@ -16,14 +16,16 @@ const sendMessage = (text) => {
 }
 
 const sharedScreen = () => {
-    // navigator.mediaDevices.getUserMedia({video: true, audio: false})
-        navigator.mediaDevices.getDisplayMedia({ video: true })
+    navigator.mediaDevices.getUserMedia({video: true, audio: false})
+        // navigator.mediaDevices.getDisplayMedia({ video: true })
         .then(stream => {
             group.shareScreen(stream)
             // sharedScreenVideo.value.srcObject = stream;
         }).catch(error => console.error('Error sharing screen: ', error))
 }
-
+group.onTrack((message) => {
+    messages.value.push(JSON.stringify(message));
+})
 group.onConnect((userInfo) => {
     currUser.value = userInfo;
 })
@@ -42,10 +44,10 @@ group.onMessage((message) => {
 })
 
 group.onSharedScreen(stream => {
-    sharedScreenVideo.value.srcObject = stream;
+    streams.value.push(stream);
 })
 group.start();
-// navigator.mediaDevices.getDisplayMedia({ video: true }).then(stream => {
+// navigator.mediaDevices.getUserMedia({video: true, audio: false}).then(stream => {
 //   group.localStream = stream;
 //   group.start();
 // }).catch(error => {
@@ -68,7 +70,9 @@ group.start();
     <div v-for="(message, index) in messages">
         {{ message }}
     </div>
-    <video autoplay="true" playsinline="true" ref="sharedScreenVideo"></video>
+    <div v-for="(stream, index) in streams">
+        <video autoplay="true" playsinline="true" :srcObject="stream"></video>
+    </div>
 </template>
 
 <style scoped lang="scss">
