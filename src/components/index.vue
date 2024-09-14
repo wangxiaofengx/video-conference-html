@@ -16,7 +16,7 @@ const sendMessage = (text) => {
 }
 
 const sharedScreen = () => {
-    navigator.mediaDevices.getUserMedia({video: true, audio: false})
+    navigator.mediaDevices.getUserMedia({video: true, audio: true})
         // navigator.mediaDevices.getDisplayMedia({ video: true })
         .then(stream => {
             group.shareScreen(stream)
@@ -24,7 +24,7 @@ const sharedScreen = () => {
         }).catch(error => console.error('Error sharing screen: ', error))
 }
 group.onTrack((message) => {
-    messages.value.push(JSON.stringify(message));
+    // messages.value.push(JSON.stringify(message));
 })
 group.onConnect((userInfo) => {
     currUser.value = userInfo;
@@ -71,7 +71,7 @@ group.start();
         {{ message }}
     </div>
     <div v-for="(stream, index) in streams">
-        <video autoplay="true" playsinline="true" :srcObject="stream"></video>
+        <video autoplay muted :srcObject="stream"></video>
     </div>
 </template>
 

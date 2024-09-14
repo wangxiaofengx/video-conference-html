@@ -175,7 +175,6 @@ class Group {
 			stream.getTracks().forEach(track => {
 				connect.addTrack(track, stream);
 			})
-
 			connect.createOffer().then(function (sessionDescription) {
 				connect.setLocalDescription(sessionDescription);
 				let message = new Message();
@@ -227,14 +226,6 @@ class Group {
 				console.log('End of candidates.');
 			}
 		}
-		// connect.onaddstream = (event) => {
-		// 	that.sharedScreenEventListener && that.sharedScreenEventListener(event.stream);
-		// }
-
-		// if(that.localStream){
-		// 	connect.addStream(that.localStream)
-		// }
-
 		connect.ontrack = (event) => {
 			console.log('receive track', event.track);
 			const remoteStream = new MediaStream();
