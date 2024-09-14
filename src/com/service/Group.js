@@ -100,8 +100,8 @@ class Group {
 		return this;
 	}
 
-	onSharedScreen(event) {
-		this.sharedScreenEventListener = event;
+	onStream(event) {
+		this.streamEventListener = event;
 		return this;
 	}
 
@@ -111,7 +111,7 @@ class Group {
 			this.messageEventListener && this.messageEventListener(message);
 		})
 		userInfo.onStream((stream) => {
-			this.sharedScreenEventListener && this.sharedScreenEventListener(stream);
+			this.streamEventListener && this.streamEventListener(stream);
 		})
 		this.joinEventListener && this.joinEventListener(userInfo);
 	}

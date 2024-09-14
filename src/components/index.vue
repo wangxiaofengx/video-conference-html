@@ -52,7 +52,7 @@ group.onMessage((message) => {
     messages.value.push(message.getData());
 })
 
-group.onSharedScreen(stream => {
+group.onStream(stream => {
     streams.value.push(stream);
 })
 group.start();
