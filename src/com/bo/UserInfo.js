@@ -19,8 +19,187 @@ class UserInfo {
 		this.name = null;
 		this._connect = null;
 		this._dataChannel = null;
+		this._eventListener = {
+			streams: [],
+			removeStreams: [],
+			messages: [],
+		};
+		this._socket = null;
 	}
 
+	onMessage(listener) {
+		this._eventListener.messages.push(listener);
+	}
+
+	onStream(listener) {
+		this._eventListener.streams.push(listener);
+	}
+
+	onRemoveStream(listener) {
+		this._eventListener.removeStreams.push(listener);
+	}
+
+	init() {
+		const message = new Message();
+		message.setType('join');
+		message.setData(this);
+		this._socket.emit(message);
+	}
+
+	connect(userInfo) {
+		let connect = this.createConnection();
+		let rtcDataChannel = this.createDataChannel(connect);
+		this.setDataChannel(rtcDataChannel);
+		this.setConnect(connect);
+
+		let message = new Message();
+		message.setType('receive');
+		message.setData(userInfo);
+		message.setReceiver(this.getId());
+		this._socket.emit(message);
+		return this;
+	}
+
+	receive() {
+		let connect = this.createConnection();
+		let rtcDataChannel = this.createDataChannel(connect);
+		this.setDataChannel(rtcDataChannel);
+		this.setConnect(connect);
+		this.offer().then(r => {
+		});
+		return this;
+	}
+
+	rtc(message) {
+		const data = message.getData();
+		if (data.type === 'offer') {
+			this.answer(data).then(r => {
+			})
+		} else if (data.type === 'answer') {
+			this.answerFinish(data).then(r => {
+			})
+		} else if (data.type === 'candidate') {
+			this.iceCandidate(data).then(r => {
+			})
+		}
+	}
+
+	async offer() {
+		const connect = this.getConnect();
+		const sessionDescription = await connect.createOffer();
+		await connect.setLocalDescription(sessionDescription);
+		let message = new Message();
+		message.setType('rtc');
+		message.setData(sessionDescription);
+		message.setReceiver(this.getId());
+		this._socket.emit(message);
+	}
+
+	async answer(data) {
+		const connect = this.getConnect();
+		await connect.setRemoteDescription(new RTCSessionDescription(data));
+		const sessionDescription = await connect.createAnswer();
+		await connect.setLocalDescription(sessionDescription);
+		let message = new Message();
+		message.setType('rtc');
+		message.setData(sessionDescription);
+		message.setReceiver(this.getId());
+		this._socket.emit(message);
+	}
+
+	async answerFinish(data) {
+		await this.getConnect().setRemoteDescription(new RTCSessionDescription(data));
+	}
+
+	async iceCandidate(data) {
+		const candidate = new RTCIceCandidate({
+			sdpMLineIndex: data.label, candidate: data.candidate
+		});
+		await this.getConnect().addIceCandidate(candidate);
+	}
+
+	async addStream(stream) {
+		let connect = this.getConnect();
+		stream.getTracks().forEach(track => {
+			connect.addTrack(track, stream);
+		})
+		await this.offer()
+	}
+
+	async removeStream(stream) {
+		let connect = this.getConnect();
+		stream.getTracks().forEach(track => {
+			const sender = connect.getSenders().find(s => s.track === track);
+			if (sender) {
+				connect.removeTrack(sender);
+			}
+		})
+		await this.offer()
+	}
+
+	createConnection() {
+		const that = this;
+		const connect = new RTCPeerConnection({
+			"iceServers": [{
+				"url": "stun:" + location.hostname
+			}, {
+				"url": "turn:" + location.hostname, username: "olddriver", credential: "olddriver"
+			}]
+		});
+		connect.onicecandidate = (event) => {
+			if (event.candidate) {
+				const candidate = {
+					type: 'candidate',
+					label: event.candidate.sdpMLineIndex,
+					id: event.candidate.sdpMid,
+					candidate: event.candidate.candidate
+				}
+				let message = new Message();
+				message.setType('rtc');
+				message.setData(candidate);
+				message.setReceiver(that.getId())
+				that._socket.emit(message);
+			} else {
+				console.log('End of candidates.');
+			}
+		}
+		connect.ontrack = (event) => {
+			console.log('receive track', event.track);
+			const remoteStream = new MediaStream();
+			// 将轨道添加到远程流
+			event.streams[0].getTracks().forEach(track => {
+				remoteStream.addTrack(track);
+			});
+			that._eventListener.streams.forEach(listener => {
+				listener(remoteStream);
+			});
+		}
+
+		connect.onremovetrack = (event) => {
+			console.log('remove track', event.track);
+		}
+
+		connect.onremovestream = (event) => {
+			console.log('remove stream', event.stream);
+		}
+
+		return connect;
+	}
+
+	createDataChannel(connect) {
+		const that = this;
+		const dataChannel = connect.createDataChannel('sendDataChannel', null);
+		connect.ondatachannel = (event) => {
+			const receiveChannel = event.channel;
+			receiveChannel.onmessage = (event) => {
+				console.log('receive data channel message', event.data);
+				that._eventListener.messages.forEach(listener => {
+					listener(new Message(JSON.parse(event.data)));
+				});
+			}
+		}
+		return dataChannel;
+	}
 
 	sendText(text) {
 		let message = new Message();

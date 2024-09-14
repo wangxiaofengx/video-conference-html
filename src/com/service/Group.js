@@ -39,78 +39,28 @@ class Group {
 		}
 
 		socket.on('init', m => {
-			const userInfo = new UserInfo(m.getData());
+			const userInfo = new UserInfo(m.getData()).setSocket(this._socket);
 			that.currUser = userInfo;
-
-			const message = new Message();
-			message.setType('join');
-			message.setData(userInfo);
-			this._socket.emit(message);
-
+			userInfo.init();
 			that.connectEventListener && that.connectEventListener(userInfo);
 		});
 
 		socket.on('join', m => {
-			const userInfo = new UserInfo(m.getData());
-			this.otherUsers.push(userInfo);
-
-			let connect = that.createConnection();
-			let rtcDataChannel = connect.createDataChannel('sendDataChannel', null);
-			userInfo.setDataChannel(rtcDataChannel);
-			userInfo.setConnect(connect);
-
-			let message = new Message();
-			message.setType('receive');
-			message.setData(that.getCurrentUser());
-			message.setReceiver(userInfo.getId());
-			this._socket.emit(message);
-
-			that.joinEventListener && that.joinEventListener(userInfo);
+			const userInfo = new UserInfo(m.getData()).setSocket(this._socket);
+			this.addUser(userInfo);
+			userInfo.connect(that.getCurrentUser())
 		})
 
 		socket.on('receive', m => {
-			const userInfo = new UserInfo(m.getData());
-			this.otherUsers.push(userInfo);
-
-			let connect = that.createConnection();
-			let rtcDataChannel = connect.createDataChannel('sendDataChannel', null);
-			userInfo.setDataChannel(rtcDataChannel);
-			userInfo.setConnect(connect);
-			connect.createOffer().then(function (sessionDescription) {
-				connect.setLocalDescription(sessionDescription);
-				let message = new Message();
-				message.setType('rtc');
-				message.setData(sessionDescription);
-				message.setReceiver(userInfo.getId());
-				that._socket.emit(message);
-			});
-
-			that.joinEventListener && that.joinEventListener(userInfo);
+			const userInfo = new UserInfo(m.getData()).setSocket(this._socket);
+			this.addUser(userInfo);
+			userInfo.receive();
 		});
 
 		socket.on('rtc', message => {
-			const data = message.getData();
 			const sender = message.getSender();
 			let userInfo = that.getUserInfo(sender);
-			if (data.type === 'offer') {
-				const connect = userInfo.getConnect();
-				connect.setRemoteDescription(new RTCSessionDescription(data));
-				connect.createAnswer().then(function (sessionDescription) {
-					connect.setLocalDescription(sessionDescription);
-					let message = new Message();
-					message.setType('rtc');
-					message.setData(sessionDescription);
-					message.setReceiver(sender);
-					that._socket.emit(message);
-				});
-			} else if (data.type === 'answer') {
-				userInfo.getConnect().setRemoteDescription(new RTCSessionDescription(data));
-			} else if (data.type === 'candidate') {
-				const candidate = new RTCIceCandidate({
-					sdpMLineIndex: data.label, candidate: data.candidate, sender: sender
-				});
-				userInfo.getConnect().addIceCandidate(candidate);
-			}
+			userInfo.rtc(message)
 		})
 
 		socket.on('leave', message => {
@@ -155,6 +105,17 @@ class Group {
 		return this;
 	}
 
+	addUser(userInfo) {
+		this.otherUsers.push(userInfo);
+		userInfo.onMessage((message) => {
+			this.messageEventListener && this.messageEventListener(message);
+		})
+		userInfo.onStream((stream) => {
+			this.sharedScreenEventListener && this.sharedScreenEventListener(stream);
+		})
+		this.joinEventListener && this.joinEventListener(userInfo);
+	}
+
 	sendText(text) {
 		let message = new Message();
 		message.setType('text');
@@ -167,24 +128,16 @@ class Group {
 		});
 	}
 
-	shareScreen(stream) {
-		const that = this;
+
+
+	addStream(stream) {
 		this.otherUsers.forEach(user => {
-			let connect = user.getConnect();
-			// connect.addStream(stream);
-			stream.getTracks().forEach(track => {
-				connect.addTrack(track, stream);
-			})
-			connect.createOffer().then(function (sessionDescription) {
-				connect.setLocalDescription(sessionDescription);
-				let message = new Message();
-				message.setType('rtc');
-				message.setData(sessionDescription);
-				message.setReceiver(user.getId());
-				that._socket.emit(message);
-			});
-
-
+			user.addStream(stream);
+		})
+	}
+	removeStream(stream) {
+		this.otherUsers.forEach(user => {
+			user.removeStream(stream);
 		})
 	}
 
@@ -198,59 +151,6 @@ class Group {
 
 	getUserInfo(userId) {
 		return this.otherUsers.find(user => user.getId() === userId);
-	}
-
-	createConnection() {
-		const that = this;
-		const connect = new RTCPeerConnection({
-			"iceServers": [{
-				"url": "stun:" + location.hostname
-			}, {
-				"url": "turn:" + location.hostname, username: "olddriver", credential: "olddriver"
-			}]
-		});
-		connect.onicecandidate = (event) => {
-			if (event.candidate) {
-				const candidate = {
-					type: 'candidate',
-					label: event.candidate.sdpMLineIndex,
-					id: event.candidate.sdpMid,
-					candidate: event.candidate.candidate
-				}
-				let message = new Message();
-				message.setType('rtc');
-				message.setData(candidate);
-				message.setReceiver(event.candidate.sender)
-				that._socket.emit(message);
-			} else {
-				console.log('End of candidates.');
-			}
-		}
-		connect.ontrack = (event) => {
-			console.log('receive track', event.track);
-			const remoteStream = new MediaStream();
-			// 将轨道添加到远程流
-			event.streams[0].getTracks().forEach(track => {
-				remoteStream.addTrack(track);
-			});
-			that.sharedScreenEventListener && that.sharedScreenEventListener(remoteStream);
-		}
-
-		connect.onremovetrack = (event) => {
-			console.log('remove track', event.track);
-		}
-
-		connect.onremovestream = (event) => {
-			console.log('remove stream', event.stream);
-		}
-		connect.ondatachannel = (event) => {
-			const receiveChannel = event.channel;
-			receiveChannel.onmessage = (event) => {
-				console.log('receive data channel message', event.data);
-				that.messageEventListener && that.messageEventListener(new Message(JSON.parse(event.data)))
-			}
-		}
-		return connect;
 	}
 }
 

@@ -15,13 +15,22 @@ const sendMessage = (text) => {
     sendText.value = ''
 }
 
-const sharedScreen = () => {
-    navigator.mediaDevices.getUserMedia({video: true, audio: true})
-        // navigator.mediaDevices.getDisplayMedia({ video: true })
-        .then(stream => {
-            group.shareScreen(stream)
-            // sharedScreenVideo.value.srcObject = stream;
-        }).catch(error => console.error('Error sharing screen: ', error))
+const sharedScreen = async () => {
+    const stream = await navigator.mediaDevices.getDisplayMedia({video: true});
+    group.addStream(stream)
+}
+const closeScreen = () => {
+
+}
+let cameraStream = null;
+const openCamera = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+    cameraStream = stream;
+    group.addStream(stream)
+}
+const closeCamera = () => {
+    group.removeStream(cameraStream)
+    cameraStream = null;
 }
 group.onTrack((message) => {
     // messages.value.push(JSON.stringify(message));
@@ -61,7 +70,10 @@ group.start();
     <div>
         <input v-model="sendText" placeholder="Enter message">
         <button @click="sendMessage">Send</button>
-        <button @click="sharedScreen">Shared screen</button>
+        <button @click="sharedScreen">屏幕共享</button>
+        <button @click="closeScreen">关闭屏幕共享</button>
+        <button @click="openCamera">打开摄像头</button>
+        <button @click="closeCamera">关闭摄像头</button>
     </div>
     <div v-for="(user, index) in otherUsers">
         {{ user.name }}:{{ user.id }}
