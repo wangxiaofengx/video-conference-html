@@ -24,19 +24,24 @@ class UserInfo {
 			removeStreams: [],
 			messages: [],
 		};
+		this._remoteStreams = [];
+		this._localStream = [];
 		this._socket = null;
 	}
 
 	onMessage(listener) {
 		this._eventListener.messages.push(listener);
+		return this;
 	}
 
 	onStream(listener) {
 		this._eventListener.streams.push(listener);
+		return this;
 	}
 
 	onRemoveStream(listener) {
 		this._eventListener.removeStreams.push(listener);
+		return this;
 	}
 
 	init() {
@@ -104,10 +109,12 @@ class UserInfo {
 		message.setType('rtc');
 		message.setData(sessionDescription);
 		message.setReceiver(this.getId());
+		console.log(this._localStream)
 		this._socket.emit(message);
 	}
 
 	async answerFinish(data) {
+		console.log(this._localStream)
 		await this.getConnect().setRemoteDescription(new RTCSessionDescription(data));
 	}
 
@@ -118,10 +125,22 @@ class UserInfo {
 		await this.getConnect().addIceCandidate(candidate);
 	}
 
+	addLocalStream(stream) {
+		this._localStream.push(stream);
+		return this;
+	}
+
+	getLocalStreams() {
+		return this._localStream;
+	}
+
 	async addStream(stream) {
 		let connect = this.getConnect();
 		stream.getTracks().forEach(track => {
-			connect.addTrack(track, stream);
+			const sender = connect.getSenders().find(s => s.track === track);
+			if (!sender) {
+				connect.addTrack(track, stream);
+			}
 		})
 		await this.offer()
 	}
@@ -135,6 +154,10 @@ class UserInfo {
 			}
 		})
 		await this.offer()
+	}
+
+	send(message) {
+
 	}
 
 	createConnection() {
@@ -164,25 +187,49 @@ class UserInfo {
 			}
 		}
 		connect.ontrack = (event) => {
-			console.log('receive track', event.track);
-			const remoteStream = new MediaStream();
-			// 将轨道添加到远程流
-			event.streams[0].getTracks().forEach(track => {
-				remoteStream.addTrack(track);
-			});
-			that._eventListener.streams.forEach(listener => {
-				listener(remoteStream);
-			});
-		}
+			console.log('receive track', event);
 
-		connect.onremovetrack = (event) => {
-			console.log('remove track', event.track);
-		}
+			const addStreams = [];
+			const removeStreams = [];
 
-		connect.onremovestream = (event) => {
-			console.log('remove stream', event.stream);
-		}
+			event.streams.forEach(stream => {
+				const oldStream = that._remoteStreams.find(s => s.id === stream.id);
+				if (!oldStream) {
+					addStreams.push(stream);
+				}
+			})
 
+			that._remoteStreams.forEach(stream => {
+				if (!event.streams.some(s => s.id === stream.id)) {
+					removeStreams.push(stream);
+				}
+			})
+
+			addStreams.forEach(stream => {
+				that._remoteStreams.push(stream);
+				try {
+					that._eventListener.streams.forEach(listener => {
+						listener(stream);
+					});
+				} catch (e) {
+					console.log(e)
+				}
+			})
+
+			removeStreams.forEach(stream => {
+				const index = that._remoteStreams.findIndex(s => s.id === stream.id);
+				if (index !== -1) {
+					that._remoteStreams.splice(index, 1);
+					try {
+						that._eventListener.removeStreams.forEach(listener => {
+							listener(stream);
+						});
+					} catch (e) {
+						console.log(e)
+					}
+				}
+			})
+		}
 		return connect;
 	}
 

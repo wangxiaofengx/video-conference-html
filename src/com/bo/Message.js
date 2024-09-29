@@ -1,7 +1,6 @@
 class Message {
 
 	constructor(options) {
-		this.sequence = null;
 		this.type = null;
 		this.data = null;
 		this.sender = null;

@@ -12,7 +12,7 @@ class Group {
 	start() {
 		const that = this;
 		const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
-		// const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + '192.168.8.75:9900' + '/video/conference/websocket/' + this.channel;
+		// const url = (location.protocol == 'https:' ? 'wss://' : 'wss://') + '192.168.8.75:9900' + '/video/conference/websocket/' + this.channel;
 		let socket = this._socket = new WebSocket(url);
 
 		socket.on = function (name, callback) {
@@ -25,13 +25,15 @@ class Group {
 		socket.onmessage = function (event) {
 			const data = JSON.parse(event.data);
 			let message = new Message(data);
-			that.treckEventListener && that.treckEventListener(message);
-			console.log(message)
 			this.event[message.getType()] && this.event[message.getType()].call(this, message);
 		};
 
 		socket.emit = (message) => {
-			socket.send(JSON.stringify(message));
+			try {
+				socket.send(JSON.stringify(message));
+			} catch (e) {
+				console.log(e);
+			}
 		}
 
 		socket.onclose = () => {
@@ -75,11 +77,6 @@ class Group {
 		})
 	}
 
-	onTrack(event) {
-		this.treckEventListener = event;
-		return this;
-	}
-
 	onConnect(event) {
 		this.connectEventListener = event;
 		return this;
@@ -105,13 +102,21 @@ class Group {
 		return this;
 	}
 
+	onRemoveStream(event) {
+		this.streamRemoveEventListener = event;
+		return this;
+	}
+
 	addUser(userInfo) {
 		this.otherUsers.push(userInfo);
 		userInfo.onMessage((message) => {
-			this.messageEventListener && this.messageEventListener(message);
+			this.messageEventListener && this.messageEventListener(message, userInfo);
 		})
 		userInfo.onStream((stream) => {
-			this.streamEventListener && this.streamEventListener(stream);
+			this.streamEventListener && this.streamEventListener(stream, userInfo);
+		})
+		userInfo.onRemoveStream((stream) => {
+			this.streamRemoveEventListener && this.streamRemoveEventListener(stream, userInfo);
 		})
 		this.joinEventListener && this.joinEventListener(userInfo);
 	}
@@ -128,13 +133,13 @@ class Group {
 		});
 	}
 
-
-
 	addStream(stream) {
 		this.otherUsers.forEach(user => {
 			user.addStream(stream);
 		})
+		this.currUser.addLocalStream(stream);
 	}
+
 	removeStream(stream) {
 		this.otherUsers.forEach(user => {
 			user.removeStream(stream);

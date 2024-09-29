@@ -16,7 +16,7 @@ const sendMessage = (text) => {
 }
 
 const sharedScreen = async () => {
-    const stream = await navigator.mediaDevices.getDisplayMedia({video: true});
+    const stream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: false});
     group.addStream(stream)
 }
 const closeScreen = () => {
@@ -24,17 +24,17 @@ const closeScreen = () => {
 }
 let cameraStream = null;
 const openCamera = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+    const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
     cameraStream = stream;
     group.addStream(stream)
 }
 const closeCamera = () => {
+    cameraStream.getTracks().forEach(track => {
+        track.stop(); // 停止视频轨道
+    });
     group.removeStream(cameraStream)
-    cameraStream = null;
+    // cameraStream = null;
 }
-group.onTrack((message) => {
-    // messages.value.push(JSON.stringify(message));
-})
 group.onConnect((userInfo) => {
     currUser.value = userInfo;
 })
@@ -43,17 +43,27 @@ group.onJoin((userInfo) => {
 })
 group.onLeave((userInfo) => {
     const index = otherUsers.value.findIndex(u => u.id === userInfo.id);
-    if (index >= 0) {
+    if (index !== -1) {
         otherUsers.value.splice(index, 1);
+        const number = streams.value.findIndex(s => s.userInfo.id === userInfo.id);
+        if (number !== -1) {
+            streams.value.splice(number, 1);
+        }
     }
 })
 
-group.onMessage((message) => {
+group.onMessage((message, userInfo) => {
     messages.value.push(message.getData());
 })
 
-group.onStream(stream => {
-    streams.value.push(stream);
+group.onStream((stream, userInfo) => {
+    streams.value.push({stream, userInfo});
+})
+group.onRemoveStream((stream, userInfo) => {
+    const number = streams.value.findIndex(s => s.stream === stream);
+    if (number !== -1) {
+        streams.value.splice(number, 1);
+    }
 })
 group.start();
 // navigator.mediaDevices.getUserMedia({video: true, audio: false}).then(stream => {
@@ -82,8 +92,8 @@ group.start();
     <div v-for="(message, index) in messages">
         {{ message }}
     </div>
-    <div v-for="(stream, index) in streams">
-        <video autoplay muted :srcObject="stream"></video>
+    <div v-for="(item, index) in streams">
+        <video autoplay muted :srcObject="item.stream"></video>
     </div>
 </template>
 
