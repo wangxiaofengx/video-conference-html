@@ -7,6 +7,13 @@ class Group {
 		this.currUser = null;
 		this._socket = null;
 		this.otherUsers = [];
+		this._eventListener = {
+			connect: [],
+			join: [],
+			leave: [],
+			message: [],
+			stream: [],
+		};
 	}
 
 	start() {
@@ -44,7 +51,9 @@ class Group {
 			const userInfo = new UserInfo(m.getData()).setSocket(this._socket);
 			that.currUser = userInfo;
 			userInfo.init();
-			that.connectEventListener && that.connectEventListener(userInfo);
+			that._eventListener.connect.forEach(event => {
+				event(userInfo);
+			});
 		});
 
 		socket.on('join', m => {
@@ -72,57 +81,57 @@ class Group {
 				let userInfo = that.otherUsers[index];
 				userInfo.dispose();
 				that.otherUsers.splice(index, 1);
-				this.leaveEventListener && this.leaveEventListener(userInfo);
+				this._eventListener.leave.forEach(event => {
+					event(userInfo);
+				});
 			}
 		})
 	}
 
 	onConnect(event) {
-		this.connectEventListener = event;
+		this._eventListener.connect.push(event);
 		return this;
 	}
 
 	onJoin(event) {
-		this.joinEventListener = event;
+		this._eventListener.join.push(event);
 		return this;
 	}
 
 	onLeave(event) {
-		this.leaveEventListener = event;
+		this._eventListener.leave.push(event);
 		return this;
 	}
 
 	onMessage(event) {
-		this.messageEventListener = event;
+		this._eventListener.message.push(event);
 		return this;
 	}
 
 	onStream(event) {
-		this.streamEventListener = event;
-		return this;
-	}
-
-	onRemoveStream(event) {
-		this.streamRemoveEventListener = event;
+		this._eventListener.stream.push(event);
 		return this;
 	}
 
 	addUser(userInfo) {
 		this.otherUsers.push(userInfo);
 		userInfo.onMessage((message) => {
-			this.messageEventListener && this.messageEventListener(message, userInfo);
+			this._eventListener.message.forEach(event => {
+				event(message, userInfo);
+			});
 		})
-		userInfo.onConnect(() => {
-			this.joinEventListener && this.joinEventListener(userInfo);
-			this.currUser.getLocalStreams().forEach(stream => {
-				userInfo.addStream(stream);
-			})
+		userInfo.onConnect(async () => {
+			for (const stream of this.currUser.getLocalStreams()) {
+				await userInfo.addStream(stream);
+			}
+			this._eventListener.join.forEach(event => {
+				event(userInfo);
+			});
 		})
 		userInfo.onStream((stream) => {
-			this.streamEventListener && this.streamEventListener(stream, userInfo);
-		})
-		userInfo.onRemoveStream((stream) => {
-			this.streamRemoveEventListener && this.streamRemoveEventListener(stream, userInfo);
+			this._eventListener.stream.forEach(event => {
+				event(stream, userInfo);
+			});
 		})
 	}
 
@@ -131,24 +140,21 @@ class Group {
 		message.setType('text');
 		message.setData(text);
 		this.otherUsers.forEach(user => {
-			let dataChannel = user.getDataChannel();
-			if (dataChannel && dataChannel.readyState === 'open') {
-				dataChannel.send(JSON.stringify(message));
-			}
+			user.sendText(text);
 		});
 	}
 
-	addStream(stream) {
-		this.otherUsers.forEach(user => {
-			user.addStream(stream);
-		})
+	async addStream(stream) {
+		for (const user of this.otherUsers) {
+			await user.addStream(stream);
+		}
 		this.currUser.addLocalStream(stream);
 	}
 
-	removeStream(stream) {
-		this.otherUsers.forEach(user => {
-			user.removeStream(stream);
-		})
+	async removeStream(stream) {
+		for (const user of this.otherUsers) {
+			await user.removeStream(stream);
+		}
 		this.currUser.removeLocalStream(stream);
 	}
 

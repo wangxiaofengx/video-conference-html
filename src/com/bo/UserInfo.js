@@ -28,7 +28,7 @@ class UserInfo {
 		this._remoteStreams = [];
 		this._localStream = [];
 		this._socket = null;
-		this._connectStatus = false;
+		this._connectComplete = false;
 	}
 
 	onMessage(listener) {
@@ -46,16 +46,11 @@ class UserInfo {
 		return this;
 	}
 
-	onRemoveStream(listener) {
-		this._eventListener.removeStreams.push(listener);
-		return this;
-	}
-
 	init() {
 		const message = new Message();
 		message.setType('join');
 		message.setData(this);
-		this._socket.emit(message);
+		this.sendSignalingMessage(message);
 	}
 
 	connect(userInfo) {
@@ -68,7 +63,7 @@ class UserInfo {
 		message.setType('receive');
 		message.setData(userInfo);
 		message.setReceiver(this.getId());
-		this._socket.emit(message);
+		this.sendSignalingMessage(message);
 		return this;
 	}
 
@@ -104,7 +99,7 @@ class UserInfo {
 		message.setType('rtc');
 		message.setData(sessionDescription);
 		message.setReceiver(this.getId());
-		this._socket.emit(message);
+		this.sendSignalingMessage(message);
 	}
 
 	async answer(data) {
@@ -116,9 +111,9 @@ class UserInfo {
 		message.setType('rtc');
 		message.setData(sessionDescription);
 		message.setReceiver(this.getId());
-		this._socket.emit(message);
-		if (!this._connectStatus) {
-			this._connectStatus = true;
+		this.sendSignalingMessage(message);
+		if (!this._connectComplete) {
+			this._connectComplete = true;
 			this._eventListener.connect.forEach(listener => {
 				listener(this);
 			});
@@ -127,8 +122,8 @@ class UserInfo {
 
 	async answerFinish(data) {
 		await this.getConnect().setRemoteDescription(new RTCSessionDescription(data));
-		if (!this._connectStatus) {
-			this._connectStatus = true;
+		if (!this._connectComplete) {
+			this._connectComplete = true;
 			this._eventListener.connect.forEach(listener => {
 				listener(this);
 			});
@@ -181,10 +176,6 @@ class UserInfo {
 		await this.offer()
 	}
 
-	send(message) {
-
-	}
-
 	createConnection() {
 		const that = this;
 		const connect = new RTCPeerConnection({
@@ -206,54 +197,63 @@ class UserInfo {
 				message.setType('rtc');
 				message.setData(candidate);
 				message.setReceiver(that.getId())
-				that._socket.emit(message);
+				that.sendSignalingMessage(message);
 			} else {
 				console.log('End of candidates.');
 			}
 		}
 		connect.ontrack = (event) => {
-			console.log('receive track', event);
-
-			const addStreams = [];
-			const removeStreams = [];
-
 			event.streams.forEach(stream => {
-				const oldStream = that._remoteStreams.find(s => s.id === stream.id);
-				if (!oldStream) {
-					addStreams.push(stream);
-				}
-			})
+				const tracks = stream.getTracks();
+				that._eventListener.streams.forEach(listener => {
+					listener(stream);
+				});
+			});
 
-			that._remoteStreams.forEach(stream => {
-				if (!event.streams.some(s => s.id === stream.id)) {
-					removeStreams.push(stream);
-				}
-			})
+			// const addStreams = [];
+			// const removeStreams = [];
+			//
+			// event.streams.forEach(stream => {
+			// 	const oldStream = that._remoteStreams.find(s => s.id === stream.id);
+			// 	if (!oldStream) {
+			// 		addStreams.push(stream);
+			// 	}
+			// })
+			//
+			// that._remoteStreams.forEach(stream => {
+			// 	if (!event.streams.some(s => s.id === stream.id)) {
+			// 		removeStreams.push(stream);
+			// 	}
+			// })
+			//
+			// addStreams.forEach(stream => {
+			// 	that._remoteStreams.push(stream);
+			// 	try {
+			// 		that._eventListener.streams.forEach(listener => {
+			// 			listener(stream);
+			// 		});
+			// 	} catch (e) {
+			// 		console.log(e)
+			// 	}
+			// })
+			//
+			// removeStreams.forEach(stream => {
+			// 	const index = that._remoteStreams.findIndex(s => s.id === stream.id);
+			// 	if (index !== -1) {
+			// 		that._remoteStreams.splice(index, 1);
+			// 		try {
+			// 			that._eventListener.removeStreams.forEach(listener => {
+			// 				listener(stream);
+			// 			});
+			// 		} catch (e) {
+			// 			console.log(e)
+			// 		}
+			// 	}
+			// })
+		}
 
-			addStreams.forEach(stream => {
-				that._remoteStreams.push(stream);
-				try {
-					that._eventListener.streams.forEach(listener => {
-						listener(stream);
-					});
-				} catch (e) {
-					console.log(e)
-				}
-			})
-
-			removeStreams.forEach(stream => {
-				const index = that._remoteStreams.findIndex(s => s.id === stream.id);
-				if (index !== -1) {
-					that._remoteStreams.splice(index, 1);
-					try {
-						that._eventListener.removeStreams.forEach(listener => {
-							listener(stream);
-						});
-					} catch (e) {
-						console.log(e)
-					}
-				}
-			})
+		connect.onremovetrack= (event) => {
+			console.log('remove track', event);
 		}
 		return connect;
 	}
@@ -264,21 +264,43 @@ class UserInfo {
 		connect.ondatachannel = (event) => {
 			const receiveChannel = event.channel;
 			receiveChannel.onmessage = (event) => {
-				console.log('receive data channel message', event.data);
-				that._eventListener.messages.forEach(listener => {
-					listener(new Message(JSON.parse(event.data)));
-				});
+				const message = new Message(JSON.parse(event.data));
+				if (message.getType() == 'rtc') {
+					that.rtc(message);
+				} else {
+					that._eventListener.messages.forEach(listener => {
+						listener(message.clone());
+					});
+				}
 			}
 		}
 		return dataChannel;
 	}
 
+	sendSignalingMessage(message) {
+		if (this._connectComplete && this.sendMessage(message)) {
+			return this;
+		}
+		this._socket.emit(message);
+		return this;
+	}
+
+	sendMessage(message) {
+		const data = JSON.stringify(message);
+		let dataChannel = this.getDataChannel();
+		if (dataChannel && dataChannel.readyState === 'open') {
+			dataChannel.send(data);
+			return true;
+		}
+		return false;
+	}
+
 	sendText(text) {
 		let message = new Message();
-		message.setType('message');
+		message.setType('text');
 		message.setData(text);
-		message.setSender(this.getId());
-
+		this.sendMessage(message);
+		return this;
 	}
 
 	setId(id) {

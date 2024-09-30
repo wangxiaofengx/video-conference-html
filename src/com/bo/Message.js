@@ -55,6 +55,9 @@ class Message {
 		return this.timestamp;
 	}
 
+	clone() {
+		return new Message(this);
+	}
 }
 
 export default Message;
