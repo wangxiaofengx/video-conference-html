@@ -112,13 +112,18 @@ class Group {
 		userInfo.onMessage((message) => {
 			this.messageEventListener && this.messageEventListener(message, userInfo);
 		})
+		userInfo.onConnect(() => {
+			this.joinEventListener && this.joinEventListener(userInfo);
+			this.currUser.getLocalStreams().forEach(stream => {
+				userInfo.addStream(stream);
+			})
+		})
 		userInfo.onStream((stream) => {
 			this.streamEventListener && this.streamEventListener(stream, userInfo);
 		})
 		userInfo.onRemoveStream((stream) => {
 			this.streamRemoveEventListener && this.streamRemoveEventListener(stream, userInfo);
 		})
-		this.joinEventListener && this.joinEventListener(userInfo);
 	}
 
 	sendText(text) {
@@ -144,6 +149,7 @@ class Group {
 		this.otherUsers.forEach(user => {
 			user.removeStream(stream);
 		})
+		this.currUser.removeLocalStream(stream);
 	}
 
 	getCurrentUser() {

@@ -23,14 +23,21 @@ class UserInfo {
 			streams: [],
 			removeStreams: [],
 			messages: [],
+			connect: [],
 		};
 		this._remoteStreams = [];
 		this._localStream = [];
 		this._socket = null;
+		this._connectStatus = false;
 	}
 
 	onMessage(listener) {
 		this._eventListener.messages.push(listener);
+		return this;
+	}
+
+	onConnect(listener) {
+		this._eventListener.connect.push(listener);
 		return this;
 	}
 
@@ -109,13 +116,23 @@ class UserInfo {
 		message.setType('rtc');
 		message.setData(sessionDescription);
 		message.setReceiver(this.getId());
-		console.log(this._localStream)
 		this._socket.emit(message);
+		if (!this._connectStatus) {
+			this._connectStatus = true;
+			this._eventListener.connect.forEach(listener => {
+				listener(this);
+			});
+		}
 	}
 
 	async answerFinish(data) {
-		console.log(this._localStream)
 		await this.getConnect().setRemoteDescription(new RTCSessionDescription(data));
+		if (!this._connectStatus) {
+			this._connectStatus = true;
+			this._eventListener.connect.forEach(listener => {
+				listener(this);
+			});
+		}
 	}
 
 	async iceCandidate(data) {
@@ -127,6 +144,14 @@ class UserInfo {
 
 	addLocalStream(stream) {
 		this._localStream.push(stream);
+		return this;
+	}
+
+	removeLocalStream(stream) {
+		const index = this._localStream.findIndex(s => s.id === stream.id);
+		if (index !== -1) {
+			this._localStream.splice(index, 1);
+		}
 		return this;
 	}
 
