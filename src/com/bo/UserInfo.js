@@ -1,5 +1,6 @@
 import Message from "./Message";
 import adapter from 'webrtc-adapter';
+import CommonUtil from "../util/CommonUtil";
 
 class UserInfo {
 
@@ -176,6 +177,17 @@ class UserInfo {
 		await this.offer()
 	}
 
+	async removeTrack(){
+		let connect = this.getConnect();
+		for (let i = 0; i < arguments.length; i++) {
+			const track = arguments[i];
+			const sender = connect.getSenders().find(s => s.track === track);
+			if (sender) {
+				connect.removeTrack(sender);
+			}
+		}
+	}
+
 	createConnection() {
 		const that = this;
 		const connect = new RTCPeerConnection({
@@ -204,7 +216,6 @@ class UserInfo {
 		}
 		connect.ontrack = (event) => {
 			event.streams.forEach(stream => {
-				const tracks = stream.getTracks();
 				that._eventListener.streams.forEach(listener => {
 					listener(stream);
 				});
@@ -252,7 +263,7 @@ class UserInfo {
 			// })
 		}
 
-		connect.onremovetrack= (event) => {
+		connect.onremovetrack = (event) => {
 			console.log('remove track', event);
 		}
 		return connect;

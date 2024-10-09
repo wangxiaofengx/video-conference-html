@@ -15,32 +15,70 @@ const sendMessage = (text) => {
     group.sendText(sendText.value)
     sendText.value = ''
 }
-
+let displayMediaStream = null;
 const sharedScreen = async () => {
-    const stream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: true});
-    await group.addStream(stream)
+    displayMediaStream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: true});
+    await group.addStream(displayMediaStream)
+    displayMediaStream.getVideoTracks()[0].addEventListener('ended', () => {
+        console.log('The user has ended sharing the screen');
+    });
 }
-const closeScreen = () => {
-
+const closeScreen = async () => {
+    await group.removeStream(displayMediaStream)
+    displayMediaStream.getTracks().forEach(track => {
+        track.stop();
+    })
+    displayMediaStream = null;
 }
-let cameraStream = null;
+let userMediaStream = null;
 const openCamera = async () => {
-    cameraStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
-    await group.addStream(cameraStream)
+    if (userMediaStream != null && userMediaStream.getTracks().some(track => track.kind === 'video')) {
+        console.error('Camera is already open')
+        return;
+    }
+    let stream = await navigator.mediaDevices.getUserMedia({video: true});
+    console.log(stream.getTracks())
+    if (!userMediaStream) {
+        userMediaStream = stream;
+    } else {
+        const mediaStreamTrack = stream.getTracks().find(track => {
+            return track.kind === 'video';
+        });
+        userMediaStream.addTrack(mediaStreamTrack);
+    }
+    await group.addStream(userMediaStream)
 }
 const closeCamera = async () => {
-    cameraStream.getTracks().forEach(track => {
-        track.stop(); // 停止视频轨道
+    const mediaStreamTrack = userMediaStream.getTracks().find(track => {
+        return track.kind == 'video';
     });
-    await group.removeStream(cameraStream)
+    mediaStreamTrack.stop();
+    await group.removeTrack(mediaStreamTrack)
+    userMediaStream.removeTrack(mediaStreamTrack)
 }
-let audioStream = null;
 const openAudio = async () => {
-    audioStream = await navigator.mediaDevices.getUserMedia({video: false, audio: true});
-    await group.addStream(audioStream)
+    if (userMediaStream != null && userMediaStream.getTracks().some(track => track.kind === 'audio')) {
+        console.error('audio is already open')
+        return;
+    }
+    let stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    if (!userMediaStream) {
+        userMediaStream = stream;
+    } else {
+        const mediaStreamTrack = stream.getTracks().find(track => {
+            return track.kind === 'audio';
+        });
+        userMediaStream.addTrack(mediaStreamTrack);
+    }
+    await group.addStream(userMediaStream)
 }
 const closeAudio = async () => {
-    await group.removeStream(audioStream)
+    const mediaStreamTrack = userMediaStream.getTracks().find(track => {
+        return track.kind == 'audio';
+    });
+    mediaStreamTrack.stop();
+    await group.removeTrack(mediaStreamTrack)
+    userMediaStream.removeTrack(mediaStreamTrack)
 }
 
 group.onConnect((userInfo) => {
@@ -67,7 +105,7 @@ group.onMessage((message, userInfo) => {
 group.onStream((stream, userInfo) => {
     const st = streams.value.find(item => item.stream.id === stream.id);
     if (!st) {
-        console.log('添加流')
+        console.log('添加流', stream.getTracks())
         streams.value.push({stream, userInfo});
         // console.log(videos.value)
         nextTick(() => {
@@ -78,6 +116,12 @@ group.onStream((stream, userInfo) => {
         stream.addEventListener('addtrack', (e) => {
             // e.track.kind==audio
             // video
+            if (e.track.kind === 'video') {
+                console.log('添加视频')
+            }
+            if (e.track.kind === 'audio') {
+                console.log('添加音频')
+            }
             console.log('添加轨道', e)
         });
         stream.addEventListener('removetrack', (e) => {
@@ -94,15 +138,17 @@ group.onStream((stream, userInfo) => {
                 const number = streams.value.findIndex(s => s.stream.id === stream.id);
                 if (number !== -1) {
                     streams.value.splice(number, 1);
+                    console.log('移除流')
                 }
             }
-            console.log('Stream removed', e)
         })
 
     } else {
-        // stream.getTracks().forEach(track => {
-        //     st.stream.addTrack(track);
-        // })
+        stream.getTracks().forEach(track => {
+            if (!st.stream.getTracks().some(t => t.kind === track.kind)) {
+                st.stream.addTrack(track);
+            }
+        })
     }
 })
 group.start();
@@ -136,6 +182,7 @@ group.start();
     </div>
     <div v-for="(item, index) in streams" style="border: 1px solid black;">
         <video autoplay muted :srcObject="item.stream" :id="item.stream.id" ref="videos"></video>
+
     </div>
 </template>
 

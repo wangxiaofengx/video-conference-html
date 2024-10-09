@@ -158,6 +158,12 @@ class Group {
 		this.currUser.removeLocalStream(stream);
 	}
 
+	async removeTrack() {
+		for (const user of this.otherUsers) {
+			await user.removeTrack(...arguments);
+		}
+	}
+
 	getCurrentUser() {
 		return this.currUser;
 	}
