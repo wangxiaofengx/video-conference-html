@@ -139,7 +139,9 @@ class UserInfo {
 	}
 
 	addLocalStream(stream) {
-		this._localStream.push(stream);
+		if (!this._localStream.some(s => s.id === stream.id)) {
+			this._localStream.push(stream);
+		}
 		return this;
 	}
 
@@ -177,7 +179,7 @@ class UserInfo {
 		await this.offer()
 	}
 
-	async removeTrack(){
+	async removeTrack() {
 		let connect = this.getConnect();
 		for (let i = 0; i < arguments.length; i++) {
 			const track = arguments[i];
@@ -220,51 +222,6 @@ class UserInfo {
 					listener(stream);
 				});
 			});
-
-			// const addStreams = [];
-			// const removeStreams = [];
-			//
-			// event.streams.forEach(stream => {
-			// 	const oldStream = that._remoteStreams.find(s => s.id === stream.id);
-			// 	if (!oldStream) {
-			// 		addStreams.push(stream);
-			// 	}
-			// })
-			//
-			// that._remoteStreams.forEach(stream => {
-			// 	if (!event.streams.some(s => s.id === stream.id)) {
-			// 		removeStreams.push(stream);
-			// 	}
-			// })
-			//
-			// addStreams.forEach(stream => {
-			// 	that._remoteStreams.push(stream);
-			// 	try {
-			// 		that._eventListener.streams.forEach(listener => {
-			// 			listener(stream);
-			// 		});
-			// 	} catch (e) {
-			// 		console.log(e)
-			// 	}
-			// })
-			//
-			// removeStreams.forEach(stream => {
-			// 	const index = that._remoteStreams.findIndex(s => s.id === stream.id);
-			// 	if (index !== -1) {
-			// 		that._remoteStreams.splice(index, 1);
-			// 		try {
-			// 			that._eventListener.removeStreams.forEach(listener => {
-			// 				listener(stream);
-			// 			});
-			// 		} catch (e) {
-			// 			console.log(e)
-			// 		}
-			// 	}
-			// })
-		}
-
-		connect.onremovetrack = (event) => {
-			console.log('remove track', event);
 		}
 		return connect;
 	}

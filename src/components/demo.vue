@@ -103,8 +103,8 @@ group.onMessage((message, userInfo) => {
 })
 
 group.onStream((stream, userInfo) => {
-    console.log(stream)
     const st = streams.value.find(item => item.stream.id === stream.id);
+    console.log(stream.getTracks())
     if (!st) {
         console.log('添加流', stream.getTracks())
         streams.value.push({stream, userInfo});
@@ -153,14 +153,37 @@ group.onStream((stream, userInfo) => {
     }
 })
 group.start();
+// navigator.mediaDevices.getUserMedia({video: true, audio: false}).then(stream => {
+//   group.localStream = stream;
+//   group.start();
+// }).catch(error => {
+//   console.error('Error getting local stream: ', error)
+//   group.start();
+// })
 
 </script>
 
 <template>
     <div>
-        <div>共享屏幕</div>
-        <div>用户列表</div>
-        <div>操作栏</div>
+        <input v-model="sendText" placeholder="Enter message">
+        <button @click="sendMessage">Send</button>
+        <button @click="sharedScreen">屏幕共享</button>
+        <button @click="closeScreen">关闭屏幕共享</button>
+        <button @click="openCamera">打开摄像头</button>
+        <button @click="closeCamera">关闭摄像头</button>
+        <button @click="openAudio">打开音频</button>
+        <button @click="closeAudio">关闭音频</button>
+    </div>
+    <div v-for="(user, index) in otherUsers">
+        {{ user.name }}:{{ user.id }}
+    </div>
+    <hr>
+    <div v-for="(message, index) in messages">
+        {{ message }}
+    </div>
+    <div v-for="(item, index) in streams" style="border: 1px solid black;">
+        <video autoplay muted :srcObject="item.stream" :id="item.stream.id" ref="videos"></video>
+
     </div>
 </template>
 
