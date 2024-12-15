@@ -4,8 +4,9 @@ import index from './components/index.vue'
 </script>
 
 <template>
-<!--    <index></index>-->
-    <demo></demo>
+    <index></index>
+<!--    <demo></demo>-->
+
 </template>
 
 <style scoped>

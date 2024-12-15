@@ -241,16 +241,22 @@ class UserInfo {
         connect.ondatachannel = (event) => {
             const receiveChannel = event.channel;
             receiveChannel.onmessage = (event) => {
-                const message = new Message(JSON.parse(event.data));
-                if (message.getType() === 'rtc') {
-                    that.rtc(message);
-                } else if (message.getType() === 'stream') {
-                    const data = message.getData();
-                    that._streamType[data.id] = data.type;
-                } else if (message.getType() === 'text') {
-                    that._eventListener.messages.forEach(listener => {
-                        listener(message.clone());
-                    });
+                if (typeof event.data === 'string') {
+                    const message = new Message(JSON.parse(event.data));
+                    if (message.getType() === 'rtc') {
+                        that.rtc(message);
+                    } else if (message.getType() === 'stream') {
+                        const data = message.getData();
+                        that._streamType[data.id] = data.type;
+                    } else if (message.getType() === 'text') {
+                        that._eventListener.messages.forEach(listener => {
+                            listener(message.clone());
+                        });
+                    } else if (message.getType() === 'file') {
+                        that._eventListener.messages.forEach(listener => {
+                            listener(message.clone());
+                        });
+                    }
                 }
             }
         }
@@ -267,12 +273,41 @@ class UserInfo {
 
     sendMessage(message) {
         const data = JSON.stringify(message);
-        let dataChannel = this.getDataChannel();
+        const dataChannel = this.getDataChannel();
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(data);
             return true;
         }
         return false;
+    }
+
+    sendFileRequest(file){
+        const message = new Message();
+        message.setType('file');
+        message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
+        this.sendMessage(message);
+    }
+
+    sendFile(file) {
+
+
+        const chunkSize = 16 * 1024;
+        const dataChannel = this.getDataChannel();
+        const sendNextChunk = (offset) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                dataChannel.send(reader.result);
+                offset += chunkSize;
+
+                if (offset < file.size) {
+                    sendNextChunk(offset);
+                }
+            };
+            const slice = file.slice(offset, offset + chunkSize);
+            reader.readAsArrayBuffer(slice);
+        }
+
+        sendNextChunk(0);
     }
 
     sendText(text) {

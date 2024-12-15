@@ -17,10 +17,8 @@ const sendMessage = (text) => {
 }
 let displayMediaStream = null;
 const sharedScreen = async () => {
-
     displayMediaStream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: true});
-    console.log(displayMediaStream, displayMediaStream.getTracks())
-    await group.addStream(displayMediaStream, 'screen')
+    await group.addStream(displayMediaStream)
     displayMediaStream.getVideoTracks()[0].addEventListener('ended', () => {
         console.log('The user has ended sharing the screen');
     });
@@ -104,9 +102,9 @@ group.onMessage((message, userInfo) => {
     messages.value.push(message.getData());
 })
 
-group.onStream((stream, userInfo, type) => {
+group.onStream((stream, userInfo) => {
+    console.log(stream)
     const st = streams.value.find(item => item.stream.id === stream.id);
-    console.log(stream, stream.getTracks(), type)
     if (!st) {
         console.log('添加流', stream.getTracks())
         streams.value.push({stream, userInfo});
@@ -159,27 +157,24 @@ group.start();
 </script>
 
 <template>
-    <div>
-        <input v-model="sendText" placeholder="Enter message">
-        <button @click="sendMessage">Send</button>
-        <button @click="sharedScreen">屏幕共享</button>
-        <button @click="closeScreen">关闭屏幕共享</button>
-        <button @click="openCamera">打开摄像头</button>
-        <button @click="closeCamera">关闭摄像头</button>
-        <button @click="openAudio">打开音频</button>
-        <button @click="closeAudio">关闭音频</button>
-    </div>
-    <div v-for="(user, index) in otherUsers">
-        {{ user.name }}:{{ user.id }}
-    </div>
-    <hr>
-    <div v-for="(message, index) in messages">
-        {{ message }}
-    </div>
-    <div v-for="(item, index) in streams" style="border: 1px solid black;">
-        <video autoplay muted :srcObject="item.stream" :id="item.stream.id" ref="videos"></video>
+    <div class="common-layout">
+        <el-container>
+            <el-main>
+                <div class="screen-region">屏幕共享区</div>
+                <div class="option-region">操作区</div>
+            </el-main>
+            <el-aside width="200px">
+                <div class="camera-region">视频区</div>
+            </el-aside>
+        </el-container>
     </div>
 </template>
 
 <style scoped lang="scss">
+.screen-region {
+    height: 400px;
+}
+.option-region{
+    height: 200px;
+}
 </style>

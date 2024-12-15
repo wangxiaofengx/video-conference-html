@@ -62,7 +62,8 @@ class Group {
         socket.on('receive', m => {
             const userInfo = new UserInfo(m.getData()).setSocket(this._socket);
             this.addUser(userInfo);
-            userInfo.receive().then(r => {});
+            userInfo.receive().then(r => {
+            });
         });
 
         socket.on('rtc', message => {
@@ -83,6 +84,10 @@ class Group {
                 });
             }
         })
+    }
+
+    stop(){
+        this._socket.close();
     }
 
     onConnect(event) {
@@ -133,12 +138,17 @@ class Group {
     }
 
     sendText(text) {
-        let message = new Message();
-        message.setType('text');
-        message.setData(text);
         this.otherUsers.forEach(user => {
             user.sendText(text);
         });
+        return this;
+    }
+
+    sendFile(file) {
+        this.otherUsers.forEach(user => {
+            user.sendFile(file);
+        });
+        return this;
     }
 
     async addStream(stream, type) {

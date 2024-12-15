@@ -12,6 +12,7 @@
     "element-plus": "^2.3.8",
     "sass": "^1.63.6",
     "vue": "^3.3.4",
+    "vue-router": "^4.5.0",
     "webrtc-adapter": "^9.0.1"
   },
   "devDependencies": {
