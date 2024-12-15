@@ -17,8 +17,10 @@ const sendMessage = (text) => {
 }
 let displayMediaStream = null;
 const sharedScreen = async () => {
+
     displayMediaStream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: true});
-    await group.addStream(displayMediaStream)
+    console.log(displayMediaStream, displayMediaStream.getTracks())
+    await group.addStream(displayMediaStream, 'screen')
     displayMediaStream.getVideoTracks()[0].addEventListener('ended', () => {
         console.log('The user has ended sharing the screen');
     });
@@ -102,9 +104,9 @@ group.onMessage((message, userInfo) => {
     messages.value.push(message.getData());
 })
 
-group.onStream((stream, userInfo) => {
+group.onStream((stream, userInfo, type) => {
     const st = streams.value.find(item => item.stream.id === stream.id);
-    console.log(stream.getTracks())
+    console.log(stream, stream.getTracks(), type)
     if (!st) {
         console.log('添加流', stream.getTracks())
         streams.value.push({stream, userInfo});
