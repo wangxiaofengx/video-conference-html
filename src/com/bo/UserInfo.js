@@ -77,15 +77,13 @@ class UserInfo {
     rtc(message) {
         const data = message.getData();
         if (data.type === 'offer') {
-            this.answer(data).then(r => {
-            })
+            return this.answer(data)
         } else if (data.type === 'answer') {
-            this.answerFinish(data).then(r => {
-            })
+            return this.answerFinish(data)
         } else if (data.type === 'candidate') {
-            this.iceCandidate(data).then(r => {
-            })
+            return this.iceCandidate(data)
         }
+        throw 'unknown rtc type'
     }
 
     async offer() {
@@ -195,13 +193,19 @@ class UserInfo {
 
     createConnection() {
         const that = this;
-        const connect = new RTCPeerConnection({
-            "iceServers": [{
-                "url": "stun:" + location.hostname
-            }, {
-                "url": "turn:" + location.hostname, username: "olddriver", credential: "olddriver"
-            }]
-        });
+        // const config = {
+        //     "iceServers": [{
+        //         "url": "stun:" + location.hostname
+        //     }, {
+        //         "url": "turn:" + location.hostname, username: "olddriver", credential: "olddriver"
+        //     }]
+        // }
+        const config = {
+            iceServers: [
+                {urls: "stun:stun.l.google.com:19302"}
+            ]
+        };
+        const connect = new RTCPeerConnection(config);
         connect.onicecandidate = (event) => {
             if (event.candidate) {
                 const candidate = {
