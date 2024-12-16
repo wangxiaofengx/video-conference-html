@@ -144,9 +144,9 @@ class Group {
         return this;
     }
 
-    sendFile(file) {
+    sendFileMeta(file) {
         this.otherUsers.forEach(user => {
-            user.sendFile(file);
+            user.sendFileMeta(file);
         });
         return this;
     }
