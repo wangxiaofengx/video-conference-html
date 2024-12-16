@@ -273,24 +273,24 @@ class UserInfo {
 
     sendMessage(message) {
         const data = JSON.stringify(message);
+        return this.sendData(data);
+    }
+
+    sendData(data){
         const dataChannel = this.getDataChannel();
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(data);
             return true;
         }
         return false;
-    }
 
-    sendFileRequest(file){
-        const message = new Message();
-        message.setType('file');
-        message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
-        this.sendMessage(message);
+        // const message = new Message();
+        // message.setType('file');
+        // message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
+        // this.sendMessage(message);
     }
 
     sendFile(file) {
-
-
         const chunkSize = 16 * 1024;
         const dataChannel = this.getDataChannel();
         const sendNextChunk = (offset) => {
