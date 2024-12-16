@@ -248,11 +248,7 @@ class UserInfo {
                     } else if (message.getType() === 'stream') {
                         const data = message.getData();
                         that._streamType[data.id] = data.type;
-                    } else if (message.getType() === 'text') {
-                        that._eventListener.messages.forEach(listener => {
-                            listener(message.clone());
-                        });
-                    } else if (message.getType() === 'file') {
+                    } else {
                         that._eventListener.messages.forEach(listener => {
                             listener(message.clone());
                         });
@@ -281,7 +277,7 @@ class UserInfo {
         return false;
     }
 
-    sendFileRequest(file){
+    sendFileRequest(file) {
         const message = new Message();
         message.setType('file');
         message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
