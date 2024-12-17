@@ -1,14 +1,14 @@
 <script setup>
 import {ref, nextTick} from 'vue'
 import Group from "../com/service/Group";
-import Message from "@/com/bo/Message";
+import Message from "../com/bo/Message";
 
 const currUser = ref({});
 const group = new Group('online');
 const otherUsers = ref([]);
 const messages = ref([]);
 const sendText = ref('');
-const uploadFile=ref({});
+const uploadFile = ref({});
 
 group.onConnect((userInfo) => {
     currUser.value = userInfo;
@@ -23,14 +23,12 @@ group.onLeave((userInfo) => {
     }
 })
 
-const onMessage = (message, userInfo) => {
-    const data = {
-        userInfo: userInfo,
-        text: message.getData(),
-        type: message.getType(),
-        time: new Date().toLocaleString()
-    }
-    messages.value.push(data);
+const onMessage = (message) => {
+    console.log(message)
+    let isSelf = message.getSender() === group.getCurrentUser().getId();
+    message.isSelf = isSelf;
+    message.username = isSelf ? group.getCurrentUser().getName() : group.getUserInfo(message.getSender()).getName()
+    messages.value.push(message);
     nextTick(() => {
         let charBox = document.getElementsByClassName('chat-box')[0];
         charBox.scrollTo({
@@ -42,13 +40,28 @@ const onMessage = (message, userInfo) => {
 }
 
 const sendMessage = () => {
-    onMessage(new Message({data: sendText.value}), currUser.value)
+    const message = new Message({sender: group.getCurrentUser().getId(), data: sendText.value, type: 'text'});
+    onMessage(message)
     group.sendText(sendText.value)
     sendText.value = ''
 }
 const selectFile = (select) => {
     uploadFile.value.clearFiles()
-    console.log(select);
+    const message = new Message({
+        sender: group.getCurrentUser().getId(),
+        data: {name: select.raw.name, size: select.raw.size},
+        type: 'file'
+    });
+    onMessage(message)
+    group.sendFile(select.raw)
+}
+const downloadFile = (message) => {
+    let sender = message.getSender();
+    const userInfo = group.getUserInfo(sender);
+    if (!userInfo) {
+        return;
+    }
+    userInfo.download(message.getData(), group.getCurrentUser().getId())
 }
 
 group.onMessage(onMessage);
@@ -62,12 +75,25 @@ group.start()
             <el-main>
                 <div class="chat-box">
                     <div v-for="(message, index) in messages"
-                         :style="message.userInfo===currUser?'text-align: right;':'text-align: left;'" :key="index">
-                        <p>
-                            {{ message.userInfo.name }} {{ message.time }}
+                         :style="message.isSelf?'text-align: right;':'text-align: left;'"
+                         :key="index">
+                        <p class="chat-user">
+                            {{ message.username }}
+                            {{ message.timestamp }}
                         </p>
-                        <p>
-                            {{ message.text }}
+                        <p v-if="message.type==='text'" class="chat-data">
+                            {{ message.data }}
+                        </p>
+                        <p v-else-if="message.type==='file'" class="chat-data">
+                            <span class="file-name">{{ message.data.name }}</span>
+                            <span class="file-size">
+                                {{ Math.round(message.data.size / 1024 / 1024 * 100) / 100 }}mb
+                            </span>
+                            <span class="file-download" v-if="!message.isSelf"
+                                  @click="downloadFile(message)">下载</span>
+                        </p>
+                        <p v-else class="chat-data">
+                            {{ message }}
                         </p>
                     </div>
                 </div>
@@ -95,8 +121,8 @@ group.start()
                     在线人数:{{ otherUsers.length + 1 }}
                 </div>
                 <div>
-                    {{ currUser.name }}(您)
-                    <div v-for="(user, index) in otherUsers">{{ user.name }}</div>
+                    {{ currUser.name }}({{ currUser.id }})(您)
+                    <div v-for="(user, index) in otherUsers">{{ user.name }}({{ user.id }})</div>
                 </div>
             </el-aside>
         </el-container>
@@ -132,5 +158,30 @@ group.start()
 .chat-box div:hover {
     background-color: #d1c4e9;
     //cursor: pointer;
+}
+
+.chat-box .chat-user {
+    font-size: 12px;
+    color: #999999;
+}
+
+.chat-box .chat-data {
+    font-size: 14px;
+    color: #333333;
+}
+
+.chat-box .file-name {
+    color: #0000ff;
+}
+
+.chat-box .file-size {
+    color: #0000ff;
+    padding: 0 0 0 8px;
+}
+
+.chat-box .file-download {
+    color: #0000ff;
+    cursor: pointer;
+    padding: 0 0 0 8px;
 }
 </style>

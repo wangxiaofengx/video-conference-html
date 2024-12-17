@@ -9,7 +9,6 @@ class Message {
 		Object.assign(this, options);
 	}
 
-
 	setType(type) {
 		this.type = type;
 		return this;

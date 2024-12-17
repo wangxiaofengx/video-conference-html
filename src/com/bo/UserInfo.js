@@ -201,9 +201,9 @@ class UserInfo {
         //     }]
         // }
         const config = {
-            iceServers: [
-                {urls: "stun:stun.l.google.com:19302"}
-            ]
+            // iceServers: [
+            //     {urls: "stun:stun.l.google.com:19302"}
+            // ]
         };
         const connect = new RTCPeerConnection(config);
         connect.onicecandidate = (event) => {
@@ -247,12 +247,19 @@ class UserInfo {
             receiveChannel.onmessage = (event) => {
                 if (typeof event.data === 'string') {
                     const message = new Message(JSON.parse(event.data));
+                    message.setSender(that.getId())
+                    message.setTimestamp(new Date().toLocaleString())
                     if (message.getType() === 'rtc') {
                         that.rtc(message);
                     } else if (message.getType() === 'stream') {
                         const data = message.getData();
                         that._streamType[data.id] = data.type;
-                    } else {
+                    }
+                        // else if (message.getType() === 'download') {
+                        //     const file = message.getData();
+                        //     // {uid: file.uid, name: file.name, size: file.size, type: file.type}
+                    // }
+                    else {
                         that._eventListener.messages.forEach(listener => {
                             listener(message.clone());
                         });
@@ -271,8 +278,20 @@ class UserInfo {
         return this;
     }
 
+    sendText(text) {
+        let message = new Message();
+        message.setType('text');
+        message.setData(text);
+        return this.sendMessage(message);
+    }
+
     sendMessage(message) {
+        message.setReceiver(this.getId());
         const data = JSON.stringify(message);
+        return this.sendData(data);
+    }
+
+    sendData(data) {
         const dataChannel = this.getDataChannel();
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(data);
@@ -281,42 +300,39 @@ class UserInfo {
         return false;
     }
 
-    sendFileRequest(file) {
+    sendFile(file) {
         const message = new Message();
         message.setType('file');
         message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
         this.sendMessage(message);
     }
 
-    sendFile(file) {
-
-
-        const chunkSize = 16 * 1024;
-        const dataChannel = this.getDataChannel();
-        const sendNextChunk = (offset) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                dataChannel.send(reader.result);
-                offset += chunkSize;
-
-                if (offset < file.size) {
-                    sendNextChunk(offset);
-                }
-            };
-            const slice = file.slice(offset, offset + chunkSize);
-            reader.readAsArrayBuffer(slice);
-        }
-
-        sendNextChunk(0);
-    }
-
-    sendText(text) {
-        let message = new Message();
-        message.setType('text');
-        message.setData(text);
+    download(file) {
+        const message = new Message();
+        message.setType('download');
+        message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
         this.sendMessage(message);
-        return this;
     }
+
+    // sendFile(file) {
+    //     const chunkSize = 16 * 1024;
+    //     const dataChannel = this.getDataChannel();
+    //     const sendNextChunk = (offset) => {
+    //         const reader = new FileReader();
+    //         reader.onload = () => {
+    //             dataChannel.send(reader.result);
+    //             offset += chunkSize;
+    //
+    //             if (offset < file.size) {
+    //                 sendNextChunk(offset);
+    //             }
+    //         };
+    //         const slice = file.slice(offset, offset + chunkSize);
+    //         reader.readAsArrayBuffer(slice);
+    //     }
+    //     sendNextChunk(0);
+    // }
+
 
     setId(id) {
         this.id = id;

@@ -86,7 +86,7 @@ class Group {
         })
     }
 
-    stop(){
+    stop() {
         this._socket.close();
     }
 
@@ -144,10 +144,14 @@ class Group {
         return this;
     }
 
-    sendFileMeta(file) {
+    sendFile(file) {
         this.otherUsers.forEach(user => {
-            user.sendFileMeta(file);
+            user.sendFile(file);
         });
+
+
+
+
         return this;
     }
 
