@@ -1,5 +1,6 @@
 <script setup>
 import {ref, nextTick} from 'vue'
+import {ElMessage} from 'element-plus'
 import Group from "../com/service/Group";
 import Message from "../com/bo/Message";
 
@@ -24,7 +25,6 @@ group.onLeave((userInfo) => {
 })
 
 const onMessage = (message) => {
-    console.log(message)
     let isSelf = message.getSender() === group.getCurrentUser().getId();
     message.isSelf = isSelf;
     message.username = isSelf ? group.getCurrentUser().getName() : group.getUserInfo(message.getSender()).getName()
@@ -59,9 +59,20 @@ const downloadFile = (message) => {
     let sender = message.getSender();
     const userInfo = group.getUserInfo(sender);
     if (!userInfo) {
+        ElMessage.error('无法下载文件，用户不在线')
         return;
     }
-    userInfo.download(message.getData(), group.getCurrentUser().getId())
+    const promise = userInfo.download(message.getData(), (chunkSize, totalSize) => {
+
+    });
+    promise.then(() => {
+        ElMessage({
+            message: message.getData().name + '下载成功',
+            type: 'success',
+        })
+    }).catch((e) => {
+        ElMessage.error(e)
+    })
 }
 
 group.onMessage(onMessage);
@@ -87,7 +98,7 @@ group.start()
                         <p v-else-if="message.type==='file'" class="chat-data">
                             <span class="file-name">{{ message.data.name }}</span>
                             <span class="file-size">
-                                {{ Math.round(message.data.size / 1024 / 1024 * 100) / 100 }}mb
+                                {{ Math.round(message.data.size / 1024 / 1024 * 100) / 100 }}MB
                             </span>
                             <span class="file-download" v-if="!message.isSelf"
                                   @click="downloadFile(message)">下载</span>

@@ -148,10 +148,6 @@ class Group {
         this.otherUsers.forEach(user => {
             user.sendFile(file);
         });
-
-
-
-
         return this;
     }
 

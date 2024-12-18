@@ -28,6 +28,8 @@ class UserInfo {
         this._localStream = [];
         this._socket = null;
         this._connectComplete = false;
+        this._sendFiles = {};
+        this._downFile = null;
     }
 
     onMessage(listener) {
@@ -220,7 +222,7 @@ class UserInfo {
                 message.setReceiver(that.getId())
                 that.sendSignalingMessage(message);
             } else {
-                console.log('End of candidates.');
+                // console.log('End of candidates.');
             }
         }
         connect.ontrack = (event) => {
@@ -254,16 +256,15 @@ class UserInfo {
                     } else if (message.getType() === 'stream') {
                         const data = message.getData();
                         that._streamType[data.id] = data.type;
-                    }
-                        // else if (message.getType() === 'download') {
-                        //     const file = message.getData();
-                        //     // {uid: file.uid, name: file.name, size: file.size, type: file.type}
-                    // }
-                    else {
+                    } else if (message.getType() === 'download') {
+                        that.transferFile(message);
+                    } else {
                         that._eventListener.messages.forEach(listener => {
                             listener(message.clone());
                         });
                     }
+                } else if (Object.prototype.toString.call(event.data) === '[object ArrayBuffer]') {
+                    that.receiveFile(event.data)
                 }
             }
         }
@@ -304,35 +305,90 @@ class UserInfo {
         const message = new Message();
         message.setType('file');
         message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
-        this.sendMessage(message);
+        this._sendFiles[file.uid] = file;
+        return this.sendMessage(message);
     }
 
-    download(file) {
-        const message = new Message();
-        message.setType('download');
-        message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
-        this.sendMessage(message);
+    download(file, process) {
+        return new Promise((resolve, reject) => {
+            if (this._downFile) {
+                reject('正在下载文件')
+                return;
+            }
+            const message = new Message();
+            message.setType('download');
+            const data = {uid: file.uid, name: file.name, size: file.size, type: file.type};
+            message.setData(data);
+            const success = this.sendMessage(message);
+            if (!success) {
+                reject('文件下载失败，通道已关闭')
+                return;
+            }
+            data.listener = process;
+            data.resolve = resolve;
+            data.reject = reject;
+            this._downFile = data;
+        })
     }
 
-    // sendFile(file) {
-    //     const chunkSize = 16 * 1024;
-    //     const dataChannel = this.getDataChannel();
-    //     const sendNextChunk = (offset) => {
-    //         const reader = new FileReader();
-    //         reader.onload = () => {
-    //             dataChannel.send(reader.result);
-    //             offset += chunkSize;
-    //
-    //             if (offset < file.size) {
-    //                 sendNextChunk(offset);
-    //             }
-    //         };
-    //         const slice = file.slice(offset, offset + chunkSize);
-    //         reader.readAsArrayBuffer(slice);
-    //     }
-    //     sendNextChunk(0);
-    // }
+    transferFile(message) {
+        const that = this;
+        const data = message.getData();
+        const file = this._sendFiles[data.uid];
+        const chunkSize = 16 * 1024;
+        const sendNextChunk = (offset) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                that.sendData(reader.result);
+                offset += chunkSize;
+                if (offset < file.size) {
+                    sendNextChunk(offset);
+                }
+            };
+            const slice = file.slice(offset, offset + chunkSize);
+            reader.readAsArrayBuffer(slice);
+        }
+        sendNextChunk(0);
+    }
 
+    receiveFile(data) {
+        const totalSize = this._downFile.size;
+        const receivedChunks = this._downFile.receivedChunks = this._downFile.receivedChunks || [];
+        const chunkSize = this._downFile.receivedSize = (this._downFile.receivedSize || 0) + data.byteLength;
+        receivedChunks.push(data);
+        if (chunkSize === totalSize) {
+            const fileArrayBuffer = this.concatenateArrayBuffers(receivedChunks);
+            const blob = new Blob([fileArrayBuffer]);
+            const fileURL = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = fileURL;
+            a.download = this._downFile.name;
+            a.click();
+
+            URL.revokeObjectURL(fileURL);
+
+            this._downFile.resolve();
+            this._downFile = null;
+
+        } else {
+            this._downFile.listener && this._downFile.listener(chunkSize, totalSize);
+        }
+    }
+
+    concatenateArrayBuffers(arrayBuffers) {
+        const totalLength = arrayBuffers.reduce((sum, buffer) => sum + buffer.byteLength, 0);
+        const mergedArrayBuffer = new ArrayBuffer(totalLength);
+        const mergedView = new Uint8Array(mergedArrayBuffer);
+
+        let offset = 0;
+        arrayBuffers.forEach(buffer => {
+            mergedView.set(new Uint8Array(buffer), offset);
+            offset += buffer.byteLength;
+        });
+
+        return mergedArrayBuffer;
+    }
 
     setId(id) {
         this.id = id;
