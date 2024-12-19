@@ -5,7 +5,7 @@ class Message {
 		this.data = null;
 		this.sender = null;
 		this.receiver = null;
-		this.timestamp = null;
+		this.timestamp = new Date().toLocaleString();
 		Object.assign(this, options);
 	}
 

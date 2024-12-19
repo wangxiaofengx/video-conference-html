@@ -5,23 +5,36 @@ import Group from "../com/service/Group";
 import Message from "../com/bo/Message";
 
 const currUser = ref({});
-const group = new Group('online');
+const group = new Group('im');
 const otherUsers = ref([]);
 const messages = ref([]);
 const sendText = ref('');
 const uploadFile = ref({});
+const uploadImage = ref({})
 
 group.onConnect((userInfo) => {
     currUser.value = userInfo;
 })
 group.onJoin((userInfo) => {
     otherUsers.value.push(userInfo);
+    const message = new Message({
+        sender: group.getCurrentUser().getId(),
+        data: userInfo.name + ' 进入了房间',
+        type: 'system'
+    });
+    onMessage(message)
 })
 group.onLeave((userInfo) => {
     const index = otherUsers.value.findIndex(u => u.id === userInfo.id);
     if (index !== -1) {
         otherUsers.value.splice(index, 1);
     }
+    const message = new Message({
+        sender: group.getCurrentUser().getId(),
+        data: userInfo.name + ' 离开了房间',
+        type: 'system'
+    });
+    onMessage(message)
 })
 
 const onMessage = (message) => {
@@ -82,13 +95,27 @@ const downloadFile = (message) => {
     })
 }
 
+const selectImage = (select) => {
+    uploadImage.value.clearFiles()
+    const reader = new FileReader();
+    reader.onloadend = function () {
+        const message = new Message({
+            sender: group.getCurrentUser().getId(),
+            data: reader.result,
+            type: 'image',
+        });
+        onMessage(message)
+    };
+    reader.readAsDataURL(select.raw);
+
+}
+
 const downloadFileCancel = (message) => {
     let sender = message.getSender();
     const userInfo = group.getUserInfo(sender);
     if (!userInfo) {
-        return;
-    }
 
+    }
 }
 
 group.onMessage(onMessage);
@@ -105,54 +132,76 @@ group.start().then(() => {
         <el-container>
             <el-main>
                 <div class="chat-box">
-                    <div v-for="(message, index) in messages"
-                         :style="message.isSelf?'text-align: right;':'text-align: left;'"
-                         :key="index">
-                        <p class="chat-user">
-                            {{ message.username }}
-                            {{ message.timestamp }}
-                        </p>
-                        <p v-if="message.type==='text'" class="chat-data">
+                    <div v-for="(message, index) in messages" :key="index" class="chat-detail">
+                        <div v-if="message.type==='system'" class="chat-type-system text-center">
                             {{ message.data }}
-                        </p>
-                        <p v-else-if="message.type==='file'" class="chat-data">
-                            <span class="file-name">{{ message.data.name }}</span>
-                            <span class="file-size">
+                        </div>
+                        <div v-else class="chat-type-user" :class="message.isSelf?'text-right':'text-left'">
+                            <p class="chat-user">
+                                {{ message.username }}
+                                {{ message.timestamp }}
+                            </p>
+                            <p v-if="message.type==='text'" class="chat-data">
+                                {{ message.data }}
+                            </p>
+                            <p v-else-if="message.type==='file'" class="chat-data">
+                                <span class="file-name">{{ message.data.name }}</span>
+                                <span class="file-size">
                                 {{ (message.data.size / 1024 / 1024).toFixed(2) }}MB
                             </span>
-                            <span v-if="!message.isSelf">
+                                <span v-if="!message.isSelf">
                                 <span class="file-download"
                                       @click="downloadFile(message)">下载</span>
                                 <span class="file-download-process">{{ message.data.progress }}</span>
-<!--                                <span v-if="message.data.status==='downloading'"-->
-<!--                                      class="file-download-cancel">取消下载</span>-->
+                                    <!--                                <span v-if="message.data.status==='downloading'"-->
+                                    <!--                                      class="file-download-cancel">取消下载</span>-->
                             </span>
-                        </p>
-                        <p v-else class="chat-data">
-                            {{ message }}
-                        </p>
+                            </p>
+                            <p v-else-if="message.type==='image'" class="chat-image">
+                                <el-image
+                                    style="width: 220px; height: auto"
+                                    :src="message.data"
+                                    :hide-on-click-modal="true"
+                                    :preview-src-list="[message.data]"
+                                    fit="cover"
+                                />
+                            </p>
+                            <p v-else class="chat-data">
+                                {{ message }}
+                            </p>
+                        </div>
                     </div>
                 </div>
                 <div>
-                    <el-button>表情</el-button>
                     <el-upload
                         ref="uploadFile"
                         :show-file-list="false"
                         multiple
                         :auto-upload="false"
                         :on-change="selectFile"
+                        style="display: inline"
                     >
                         <el-button>文件</el-button>
                     </el-upload>
 
-                    <el-button>图片</el-button>
+                    <el-upload
+                        ref="uploadImage"
+                        :show-file-list="false"
+                        multiple
+                        :auto-upload="false"
+                        :on-change="selectImage"
+                        style="display: inline"
+                        list-type="picture"
+                    >
+                        <el-button>图片</el-button>
+                    </el-upload>
                 </div>
                 <div>
                     <el-input v-model="sendText" class="send-text" @keydown.enter="sendMessage"></el-input>
                     <el-button @click="sendMessage">发送</el-button>
                 </div>
             </el-main>
-            <el-aside width="200px">
+            <el-aside width="150px">
                 <div>
                     在线人数:{{ otherUsers.length + 1 }}
                 </div>
@@ -167,11 +216,24 @@ group.start().then(() => {
 
 <style scoped lang="scss">
 
+
+.text-left {
+    text-align: left;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
 .chat-box {
     overflow: auto;
     overflow-anchor: none;
     scroll-behavior: smooth;
-    height: 400px;
+    height: 500px;
     border: 1px solid #000;
 }
 
@@ -179,19 +241,25 @@ group.start().then(() => {
     width: 100%
 }
 
-.chat-box div {
+.chat-box .chat-type-user {
     padding: 5px;
 }
 
-.chat-box div:nth-child(odd) {
+.chat-box .chat-type-system {
+    color: #666666;
+    font-size: 11px;
+    font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+}
+
+.chat-box .chat-type-user:nth-of-type(odd) {
     background-color: #f2f2f2;
 }
 
-.chat-box div:nth-child(even) {
+.chat-box .chat-type-user:nth-of-type(even) {
     background-color: #ffffff;
 }
 
-.chat-box div:hover {
+.chat-box .chat-type-user:hover {
     background-color: #d1c4e9;
     //cursor: pointer;
 }
@@ -222,7 +290,16 @@ group.start().then(() => {
 }
 
 .chat-box .file-download-process {
-    color: #666666;
+    color: #808080;
     padding: 0 0 0 8px;
 }
+
+//.chat-box .chat-image img {
+//    width: 400px;
+//    height: auto;
+//    transition: transform 0.3s ease;
+//}
+//.chat-box .chat-image img:hover {
+//    transform: scale(1.5); /* 放大1.5倍 */
+//}
 </style>
