@@ -62,22 +62,42 @@ const downloadFile = (message) => {
         ElMessage.error('无法下载文件，用户不在线')
         return;
     }
+    userInfo.onClose(() => {
+        message.data.progress = '下载失败，用户离线';
+        message.data.status = 'error';
+        ElMessage.error(message.getData().name + '下载失败，用户离线')
+    })
     const promise = userInfo.download(message.getData(), (chunkSize, totalSize) => {
-
+        const number = (chunkSize / 1024 / 1024).toFixed(2);
+        const percent = (chunkSize / totalSize * 100).toFixed(2);
+        message.data.progress = number + 'MB' + '(' + percent + '%)';
+        message.data.status = 'downloading';
     });
     promise.then(() => {
-        ElMessage({
-            message: message.getData().name + '下载成功',
-            type: 'success',
-        })
+        message.data.progress = '下载完成';
+        message.data.status = 'success';
+        ElMessage.success(message.getData().name + '下载成功')
     }).catch((e) => {
         ElMessage.error(e)
     })
 }
 
+const downloadFileCancel = (message) => {
+    let sender = message.getSender();
+    const userInfo = group.getUserInfo(sender);
+    if (!userInfo) {
+        return;
+    }
+
+}
+
 group.onMessage(onMessage);
 
-group.start()
+group.start().then(() => {
+    ElMessage.success('建立连接成功')
+}).catch((e) => {
+    ElMessage.error('建立连接失败:' + e)
+});
 </script>
 
 <template>
@@ -98,10 +118,15 @@ group.start()
                         <p v-else-if="message.type==='file'" class="chat-data">
                             <span class="file-name">{{ message.data.name }}</span>
                             <span class="file-size">
-                                {{ Math.round(message.data.size / 1024 / 1024 * 100) / 100 }}MB
+                                {{ (message.data.size / 1024 / 1024).toFixed(2) }}MB
                             </span>
-                            <span class="file-download" v-if="!message.isSelf"
-                                  @click="downloadFile(message)">下载</span>
+                            <span v-if="!message.isSelf">
+                                <span class="file-download"
+                                      @click="downloadFile(message)">下载</span>
+                                <span class="file-download-process">{{ message.data.progress }}</span>
+<!--                                <span v-if="message.data.status==='downloading'"-->
+<!--                                      class="file-download-cancel">取消下载</span>-->
+                            </span>
                         </p>
                         <p v-else class="chat-data">
                             {{ message }}
@@ -193,6 +218,11 @@ group.start()
 .chat-box .file-download {
     color: #0000ff;
     cursor: pointer;
+    padding: 0 0 0 8px;
+}
+
+.chat-box .file-download-process {
+    color: #666666;
     padding: 0 0 0 8px;
 }
 </style>
