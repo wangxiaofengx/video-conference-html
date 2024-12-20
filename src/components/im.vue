@@ -35,6 +35,15 @@ group.onLeave((userInfo) => {
         type: 'system'
     });
     onMessage(message)
+
+    if (otherUsers.value.length === 0) {
+        const message = new Message({
+            sender: group.getCurrentUser().getId(),
+            data: '系统检测到房间内无其他用户，请手动刷新页面尝试获取用户',
+            type: 'system'
+        });
+        onMessage(message)
+    }
 })
 
 const onMessage = (message) => {
@@ -42,14 +51,16 @@ const onMessage = (message) => {
     message.isSelf = isSelf;
     message.username = isSelf ? group.getCurrentUser().getName() : group.getUserInfo(message.getSender()).getName()
     messages.value.push(message);
-    nextTick(() => {
+
+    const delay = message.getType() === 'image' ? setTimeout : nextTick;
+    delay(() => {
         let charBox = document.getElementsByClassName('chat-box')[0];
         charBox.scrollTo({
             top: charBox.scrollHeight,
             behavior: 'smooth',
         });
         // window.focus()
-    })
+    }, message.getType() === 'image' ? 10 : undefined)
 }
 
 const sendMessage = () => {
@@ -99,15 +110,17 @@ const selectImage = (select) => {
     uploadImage.value.clearFiles()
     const reader = new FileReader();
     reader.onloadend = function () {
+        const blob = new Blob([reader.result], {type: 'image/jpeg'}); // 可以根据图片类型调整 MIME 类型
+        const url = URL.createObjectURL(blob);
         const message = new Message({
             sender: group.getCurrentUser().getId(),
-            data: reader.result,
+            data: url,
             type: 'image',
         });
         onMessage(message)
     };
-    reader.readAsDataURL(select.raw);
-
+    reader.readAsArrayBuffer(select.raw);
+    group.sendImage(select.raw)
 }
 
 const downloadFileCancel = (message) => {
@@ -116,6 +129,20 @@ const downloadFileCancel = (message) => {
     if (!userInfo) {
 
     }
+}
+
+const modifyUsername = () => {
+    const username = prompt(' 修改昵称 ', currUser.value.name);
+    if (username === null || username === undefined) {
+        return;
+    }
+    if (username === '') {
+        localStorage.removeItem('username')
+    } else{
+        localStorage.setItem('username', username)
+        currUser.value.name = username
+    }
+    ElMessage.success('昵称修改成功，请刷新页面')
 }
 
 group.onMessage(onMessage);
@@ -159,7 +186,7 @@ group.start().then(() => {
                             </p>
                             <p v-else-if="message.type==='image'" class="chat-image">
                                 <el-image
-                                    style="width: 220px; height: auto"
+                                    style="width: 400px; height: auto"
                                     :src="message.data"
                                     :hide-on-click-modal="true"
                                     :preview-src-list="[message.data]"
@@ -189,9 +216,9 @@ group.start().then(() => {
                         :show-file-list="false"
                         multiple
                         :auto-upload="false"
+                        accept="image/*"
                         :on-change="selectImage"
                         style="display: inline"
-                        list-type="picture"
                     >
                         <el-button>图片</el-button>
                     </el-upload>
@@ -201,12 +228,15 @@ group.start().then(() => {
                     <el-button @click="sendMessage">发送</el-button>
                 </div>
             </el-main>
-            <el-aside width="150px">
+            <el-aside width="200px">
                 <div>
                     在线人数:{{ otherUsers.length + 1 }}
                 </div>
                 <div>
-                    {{ currUser.name }}({{ currUser.id }})(您)
+                    <div @click="modifyUsername" style="cursor: pointer;color: blue;">{{ currUser.name }}({{
+                            currUser.id
+                        }})(您)
+                    </div>
                     <div v-for="(user, index) in otherUsers">{{ user.name }}({{ user.id }})</div>
                 </div>
             </el-aside>
@@ -234,7 +264,7 @@ group.start().then(() => {
     overflow-anchor: none;
     scroll-behavior: smooth;
     height: 500px;
-    border: 1px solid #000;
+    border: 1px solid #00000026;
 }
 
 .send-text {
@@ -247,7 +277,7 @@ group.start().then(() => {
 
 .chat-box .chat-type-system {
     color: #666666;
-    font-size: 11px;
+    font-size: 12px;
     font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
 }
 
@@ -260,17 +290,17 @@ group.start().then(() => {
 }
 
 .chat-box .chat-type-user:hover {
-    background-color: #d1c4e9;
+    background-color: #cccccc;
     //cursor: pointer;
 }
 
 .chat-box .chat-user {
-    font-size: 12px;
+    font-size: 14px;
     color: #999999;
 }
 
 .chat-box .chat-data {
-    font-size: 14px;
+    font-size: 16px;
     color: #333333;
 }
 
