@@ -91,10 +91,24 @@ const downloadFile = (message) => {
         message.data.status = 'error';
         ElMessage.error(message.getData().name + '下载失败，用户离线')
     })
+    let begin = Date.now();
+    let beginChunkSize = 0;
+    let networkSpeed = '0KB/s';
     const promise = userInfo.download(message.getData(), (chunkSize, totalSize) => {
+        const now = Date.now();
+        if (now - begin > 1000) {
+            begin = now;
+            const kb = (chunkSize - beginChunkSize) / 1024;
+            beginChunkSize = chunkSize;
+            if (kb > 1024) {
+                networkSpeed = (kb / 1024).toFixed(2) + 'MB/s';
+            } else {
+                networkSpeed = kb.toFixed(2) + 'KB/s';
+            }
+        }
         const number = (chunkSize / 1024 / 1024).toFixed(2);
         const percent = (chunkSize / totalSize * 100).toFixed(2);
-        message.data.progress = number + 'MB' + '(' + percent + '%)';
+        message.data.progress = number + 'MB' + '(' + percent + '%)  ' + networkSpeed;
         message.data.status = 'downloading';
     });
     promise.then(() => {
@@ -138,7 +152,7 @@ const modifyUsername = () => {
     }
     if (username === '') {
         localStorage.removeItem('username')
-    } else{
+    } else {
         localStorage.setItem('username', username)
         currUser.value.name = username
     }
