@@ -137,12 +137,16 @@ const selectImage = (select) => {
     group.sendImage(select.raw)
 }
 
-const downloadFileCancel = (message) => {
+const downloadFileCancel = async (message) => {
     let sender = message.getSender();
     const userInfo = group.getUserInfo(sender);
     if (!userInfo) {
-
+        ElMessage.error('无法取消下载，用户不在线')
+        return;
     }
+    await userInfo.downloadCancel(message.getData())
+    message.data.progress = '';
+    message.data.status = 'cancel';
 }
 
 const modifyUsername = () => {
@@ -194,8 +198,8 @@ group.start().then(() => {
                                 <span class="file-download"
                                       @click="downloadFile(message)">下载</span>
                                 <span class="file-download-process">{{ message.data.progress }}</span>
-                                    <!--                                <span v-if="message.data.status==='downloading'"-->
-                                    <!--                                      class="file-download-cancel">取消下载</span>-->
+                                <span v-if="message.data.status==='downloading'" class="file-download-cancel"
+                                      @click="downloadFileCancel(message)">取消下载</span>
                             </span>
                             </p>
                             <p v-else-if="message.type==='image'" class="chat-image">
@@ -337,13 +341,9 @@ group.start().then(() => {
     color: #808080;
     padding: 0 0 0 8px;
 }
-
-//.chat-box .chat-image img {
-//    width: 400px;
-//    height: auto;
-//    transition: transform 0.3s ease;
-//}
-//.chat-box .chat-image img:hover {
-//    transform: scale(1.5); /* 放大1.5倍 */
-//}
+.chat-box .file-download-cancel{
+    color: #ff0000;
+    cursor: pointer;
+    padding: 0 0 0 8px;
+}
 </style>

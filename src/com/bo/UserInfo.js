@@ -40,6 +40,7 @@ class UserInfo {
 		this._downFile = null;
 		this._downImage = null;
 		this._downImageQueue = [];
+		this._transferCahnnel = [];
 	}
 
 	onMessage(listener) {
@@ -260,6 +261,8 @@ class UserInfo {
 						that._streamType[data.id] = data.type;
 					} else if (message.getType() === 'download') {
 						await that.transferFile(message);
+					} else if (message.getType() === 'download-cancel') {
+						await that.transferFileCancel(that.getFileChannel());
 					} else {
 						that._eventListener.messages.forEach(listener => {
 							listener(message.clone());
@@ -374,6 +377,21 @@ class UserInfo {
 		})
 	}
 
+	async downloadCancel(file) {
+		if (!this._downFile) {
+			return;
+		}
+		const message = new Message();
+		message.setType('download-cancel');
+		const data = {uid: file.uid};
+		message.setData(data);
+		const success = await this.sendMessage(message);
+		if (!success) {
+			throw '取消失败，通道已关闭'
+		}
+		this._downFile = null;
+	}
+
 	async transferFile(message) {
 		const data = message.getData();
 		const file = this._sendFiles[data.uid];
@@ -381,13 +399,34 @@ class UserInfo {
 		return await this.sendFileChunk(fileChannel, file);
 	}
 
+	transferFileCancel(channel) {
+		const index = this._transferCahnnel.indexOf(channel);
+		if (index === -1) {
+			return;
+		}
+		this._transferCahnnel.splice(index, 1);
+	}
+
 	sendFileChunk(fileChannel, file) {
 		const that = this;
 		const chunkSize = 16 * 1024;
+
 		return new Promise((resolve, reject) => {
+			if (that._transferCahnnel.includes(fileChannel)) {
+				reject('通道被占用，请等待下载完成或取消下载');
+				return;
+			}
+			that._transferCahnnel.push(fileChannel);
 			const sendNextChunk = (offset) => {
 				const reader = new FileReader();
 				reader.onload = async () => {
+
+					const index = that._transferCahnnel.indexOf(fileChannel);
+					if (index === -1) {
+						// reject('文件发送失败，对方已取消');
+						return;
+					}
+
 					const success = await that.sendData(fileChannel, reader.result);
 					if (!success) {
 						// reject('文件发送失败，通道已关闭');
@@ -397,6 +436,7 @@ class UserInfo {
 					if (offset < file.size) {
 						sendNextChunk(offset);
 					} else {
+						that._transferCahnnel.splice(index, 1);
 						resolve();
 					}
 				};
@@ -408,6 +448,9 @@ class UserInfo {
 	}
 
 	receiveFile(data) {
+		if (!this._downFile) {
+			return;
+		}
 		const totalSize = this._downFile.size;
 		const receivedChunks = this._downFile.receivedChunks = this._downFile.receivedChunks || [];
 		const chunkSize = this._downFile.receivedSize = (this._downFile.receivedSize || 0) + data.byteLength;
@@ -480,7 +523,7 @@ class UserInfo {
 			receivedChunks.push(data);
 			if (chunkSize === totalSize) {
 				const fileArrayBuffer = this.concatenateArrayBuffers(receivedChunks)
-				const blob = new Blob([fileArrayBuffer], {type: 'image/jpeg'}); // 可以根据图片类型调整 MIME 类型
+				const blob = new Blob([fileArrayBuffer], {type: 'image/jpeg'});
 				const url = URL.createObjectURL(blob);
 				const message = new Message();
 				message.setType('image');
