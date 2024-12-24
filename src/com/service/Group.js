@@ -15,9 +15,10 @@ class Group {
 	start() {
 		return new Promise((resolve, reject) => {
 			const that = this;
+			const url ='https://video-conference-109531-4-1326936129.sh.run.tcloudbase.com/video/conference/websocket/' + this.channel;
 			// const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
 			// const url = (location.protocol == 'https:' ? 'wss://' : 'wss://') + 'localhost:9900' + '/video/conference/websocket/' + this.channel;
-			const url = 'ws://' + location.hostname + ':9900/video/conference/websocket/' + this.channel;
+			// const url = 'ws://' + location.hostname + ':9900/video/conference/websocket/' + this.channel;
 			const socket = this._socket = new WebSocket(url);
 
 			socket.on = function (name, callback) {
