@@ -281,7 +281,7 @@ group.start().then(() => {
     overflow: auto;
     overflow-anchor: none;
     scroll-behavior: smooth;
-    height: 500px;
+    height: 800px;
     border: 1px solid #00000026;
 }
 
