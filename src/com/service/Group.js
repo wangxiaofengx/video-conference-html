@@ -15,9 +15,8 @@ class Group {
 
     start() {
         return new Promise((resolve, reject) => {
-            const that = this;
-            const url = 'https://video-conference-109531-4-1326936129.sh.run.tcloudbase.com/video/conference/websocket/' + this.channel;
-            // const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
+            // const url = 'https://video-conference-109531-4-1326936129.sh.run.tcloudbase.com/video/conference/websocket/' + this.channel;
+            const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
             // const url = (location.protocol == 'https:' ? 'wss://' : 'wss://') + 'localhost:9900' + '/video/conference/websocket/' + this.channel;
             // const url = 'ws://' + location.hostname + '/video/conference/websocket/' + this.channel;
             const socket = this._socket = new WebSocket(url);
@@ -60,9 +59,9 @@ class Group {
                 if (username) {
                     userInfo.setName(username)
                 }
-                that.currUser = userInfo;
+                this.currUser = userInfo;
                 await userInfo.init();
-                that._eventListener.connect.forEach(event => {
+                this._eventListener.connect.forEach(event => {
                     event(userInfo);
                 });
             });
@@ -70,7 +69,7 @@ class Group {
             socket.on('join', async m => {
                 const userInfo = new UserInfo(m.getData()).setSocket(this._socket).setIceServers(this._iceServers);
                 this.addUser(userInfo);
-                await userInfo.connect(that.getCurrentUser())
+                await userInfo.connect(this.getCurrentUser())
             })
 
             socket.on('receive', async m => {
@@ -81,7 +80,7 @@ class Group {
 
             socket.on('rtc', async message => {
                 const sender = message.getSender();
-                let userInfo = that.getUserInfo(sender);
+                let userInfo = this.getUserInfo(sender);
                 await userInfo.rtc(message)
             })
         });
