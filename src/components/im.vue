@@ -87,6 +87,9 @@ const downloadFile = (message) => {
         return;
     }
     userInfo.onClose(() => {
+        if (message.data.status !== 'downloading') {
+            return;
+        }
         message.data.progress = '下载失败，用户离线';
         message.data.status = 'error';
         ElMessage.error(message.getData().name + '下载失败，用户离线')
@@ -341,7 +344,8 @@ group.start().then(() => {
     color: #808080;
     padding: 0 0 0 8px;
 }
-.chat-box .file-download-cancel{
+
+.chat-box .file-download-cancel {
     color: #ff0000;
     cursor: pointer;
     padding: 0 0 0 8px;
