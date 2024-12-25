@@ -8,7 +8,7 @@ class Group {
         this._socket = null;
         this.otherUsers = [];
         this._eventListener = {
-            connect: [], join: [], leave: [], message: [], stream: [],
+            connect: [], join: [], leave: [], message: [], stream: [], close: []
         };
         this._iceServers = [];
     }
@@ -35,6 +35,9 @@ class Group {
             };
 
             socket.onclose = () => {
+                this._eventListener.close.forEach(event => {
+                    event();
+                });
                 reject('websocket closed');
             }
 
@@ -108,6 +111,11 @@ class Group {
 
     onStream(event) {
         this._eventListener.stream.push(event);
+        return this;
+    }
+
+    onClose(event) {
+        this._eventListener.close.push(event);
         return this;
     }
 

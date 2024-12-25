@@ -45,6 +45,15 @@ group.onLeave((userInfo) => {
         onMessage(message)
     }
 })
+group.onClose(() => {
+    ElMessage.error('连接已断开')
+    const message = new Message({
+        sender: group.getCurrentUser().getId(),
+        data: '系统检测到连接已断开，请手动刷新页面尝试获取用户',
+        type: 'system'
+    });
+    onMessage(message)
+})
 
 const onMessage = (message) => {
     let isSelf = message.getSender() === group.getCurrentUser().getId();
@@ -86,14 +95,18 @@ const downloadFile = (message) => {
         ElMessage.error('无法下载文件，用户不在线')
         return;
     }
-    userInfo.onClose(() => {
-        if (message.data.status !== 'downloading') {
-            return;
+    if (!message.data.onClose) {
+        message.data.onClose = () => {
+            if (message.data.status !== 'downloading') {
+                return;
+            }
+            message.data.progress = '下载失败，用户离线';
+            message.data.status = 'error';
+            ElMessage.error(message.getData().name + '下载失败，用户离线')
         }
-        message.data.progress = '下载失败，用户离线';
-        message.data.status = 'error';
-        ElMessage.error(message.getData().name + '下载失败，用户离线')
-    })
+        userInfo.onClose(message.data.onClose)
+    }
+
     let begin = Date.now();
     let beginChunkSize = 0;
     let networkSpeed = '0KB/s';
@@ -148,6 +161,7 @@ const downloadFileCancel = async (message) => {
         return;
     }
     await userInfo.downloadCancel(message.getData())
+    delete message.data.onClose;
     message.data.progress = '';
     message.data.status = 'cancel';
 }
