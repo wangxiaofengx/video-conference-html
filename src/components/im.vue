@@ -108,11 +108,11 @@ const downloadFile = (message) => {
         }
         const number = (chunkSize / 1024 / 1024).toFixed(2);
         const percent = (chunkSize / totalSize * 100).toFixed(2);
-        message.data.progress = number + 'MB' + '(' + percent + '%)  ' + networkSpeed;
+        message.data.progress = number + 'MB' + '(' + percent + '%) - ' + networkSpeed;
         message.data.status = 'downloading';
     });
     promise.then(() => {
-        message.data.progress = '下载完成';
+        message.data.progress = '下载完成 - ' + networkSpeed;
         message.data.status = 'success';
         ElMessage.success(message.getData().name + '下载成功')
     }).catch((e) => {
