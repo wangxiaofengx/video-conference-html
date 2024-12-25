@@ -10,7 +10,8 @@ const otherUsers = ref([]);
 const messages = ref([]);
 const sendText = ref('');
 const uploadFile = ref({});
-const uploadImage = ref({})
+const uploadImage = ref({});
+const streamMap = ref({});
 
 group.onConnect((userInfo) => {
     currUser.value = userInfo;
@@ -180,6 +181,35 @@ const modifyUsername = () => {
     ElMessage.success('昵称修改成功，请刷新页面')
 }
 
+const openCamera = async () => {
+    let stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+    const id = group.getCurrentUser().getId();
+    const streams = streamMap[id];
+    if (!streams) {
+        streamMap[id] = [];
+    }
+    streamMap[id].push(stream);
+    await group.addStream(stream, 'UserMedia')
+}
+
+const closeCamera = () => {
+    const id = group.getCurrentUser().getId();
+}
+
+const sharedScreen = async () => {
+    let stream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: true});
+    const id = group.getCurrentUser().getId();
+    const streams = streamMap[id];
+    if (!streams) {
+        streamMap[id] = [];
+    }
+    streamMap[id].push(stream);
+}
+
+const closeScreen = () => {
+
+}
+
 group.onMessage(onMessage);
 
 group.start().then(() => {
@@ -257,6 +287,8 @@ group.start().then(() => {
                     >
                         <el-button>图片</el-button>
                     </el-upload>
+                    <el-button>语音视频</el-button>
+                    <el-button>屏幕共享</el-button>
                 </div>
                 <div>
                     <el-input v-model="sendText" class="send-text" @keydown.enter="sendMessage"></el-input>
@@ -272,7 +304,13 @@ group.start().then(() => {
                             currUser.id
                         }})(您)
                     </div>
-                    <div v-for="(user, index) in otherUsers">{{ user.name }}({{ user.id }})</div>
+                    <div v-for="(user, index) in otherUsers">
+                        <div>{{ user.name }}({{ user.id }})</div>
+                        <div v-if="streamMap[user.id]" v-for="(item, index) in streamMap[user.id]"
+                             style="border: 1px solid black;">
+                            <video autoplay muted :srcObject="item.stream" :id="item.stream.id" ref="videos"></video>
+                        </div>
+                    </div>
                 </div>
             </el-aside>
         </el-container>
