@@ -8,15 +8,15 @@ class Group {
         this._socket = null;
         this.otherUsers = [];
         this._eventListener = {
-            connect: [], join: [], leave: [], message: [], stream: [], close: []
+            connect: [], join: [], leave: [], message: [], stream: [], closeStream: [], close: []
         };
         this._iceServers = [];
     }
 
     start() {
         return new Promise((resolve, reject) => {
-            // const url = 'https://video-conference-109531-4-1326936129.sh.run.tcloudbase.com/video/conference/websocket/' + this.channel;
-            const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
+            const url = 'https://d28c4rauq8y8l3.cloudfront.net/video/conference/websocket/' + this.channel;
+            // const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
             // const url = (location.protocol == 'https:' ? 'wss://' : 'wss://') + 'localhost:9900' + '/video/conference/websocket/' + this.channel;
             // const url = 'ws://' + location.hostname + '/video/conference/websocket/' + this.channel;
             const socket = this._socket = new WebSocket(url);
@@ -114,6 +114,11 @@ class Group {
         return this;
     }
 
+    onCloseStream(event) {
+        this._eventListener.closeStream.push(event);
+        return this;
+    }
+
     onClose(event) {
         this._eventListener.close.push(event);
         return this;
@@ -150,6 +155,11 @@ class Group {
                 event(stream, userInfo, type);
             });
         })
+        userInfo.onCloseStream((stream, type) => {
+            this._eventListener.closeStream.forEach(event => {
+                event(stream, userInfo, type);
+            })
+        });
     }
 
     sendText(text) {

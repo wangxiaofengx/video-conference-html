@@ -73,6 +73,36 @@ const onMessage = (message) => {
     }, message.getType() === 'image' ? 10 : undefined)
 }
 
+const onStream = (stream, userInfo, type) => {
+    stream.label = type;
+    const id = userInfo.getId();
+    let map = streamMap.value;
+    const streams = map[id];
+    if (!streams) {
+        map[id] = [];
+    }
+    map[id].push(stream);
+}
+
+const onCloseStream = (stream, userInfo, type) => {
+    const id = userInfo.getId();
+    let map = streamMap.value;
+    const streams = map[id];
+    if (!streams) {
+        return;
+    }
+    const index = streams.findIndex(s => s === stream);
+    if (index !== -1) {
+        streams.splice(index, 1);
+    }
+    if (streams.length === 0) {
+        delete map[id];
+    }
+    if (userInfo === group.getCurrentUser()) {
+        stream.getTracks().forEach(track => track.stop())
+    }
+}
+
 const sendMessage = () => {
     const message = new Message({sender: group.getCurrentUser().getId(), data: sendText.value, type: 'text'});
     onMessage(message)
@@ -183,33 +213,36 @@ const modifyUsername = () => {
 
 const openCamera = async () => {
     let stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-    const id = group.getCurrentUser().getId();
-    const streams = streamMap[id];
-    if (!streams) {
-        streamMap[id] = [];
-    }
-    streamMap[id].push(stream);
-    await group.addStream(stream, 'UserMedia')
+    const type = 'UserMedia'
+    onStream(stream, group.getCurrentUser(), type)
+    await group.addStream(stream, type)
 }
 
-const closeCamera = () => {
+const closeCamera = async () => {
     const id = group.getCurrentUser().getId();
+    const streams = streamMap.value[id];
+    if (!streams) {
+        return;
+    }
+    const type = 'UserMedia'
+    const stream = streams.find(stream => stream.label === type);
+    onCloseStream(stream, group.getCurrentUser(), type)
+    await group.removeStream(stream)
 }
 
 const sharedScreen = async () => {
     let stream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: true});
-    const id = group.getCurrentUser().getId();
-    const streams = streamMap[id];
-    if (!streams) {
-        streamMap[id] = [];
-    }
-    streamMap[id].push(stream);
+    const type = 'DisplayMedia'
+    onStream(stream, group.getCurrentUser(), type)
+    await group.addStream(stream, type)
 }
 
 const closeScreen = () => {
 
 }
 
+group.onStream(onStream);
+group.onCloseStream(onCloseStream);
 group.onMessage(onMessage);
 
 group.start().then(() => {
@@ -287,28 +320,34 @@ group.start().then(() => {
                     >
                         <el-button>图片</el-button>
                     </el-upload>
-                    <el-button>语音视频</el-button>
-                    <el-button>屏幕共享</el-button>
+                    <el-button @click="openCamera">语音视频</el-button>
+                    <el-button @click="sharedScreen">屏幕共享</el-button>
                 </div>
                 <div>
                     <el-input v-model="sendText" class="send-text" @keydown.enter="sendMessage"></el-input>
                     <el-button @click="sendMessage">发送</el-button>
                 </div>
             </el-main>
-            <el-aside width="200px">
-                <div>
-                    在线人数:{{ otherUsers.length + 1 }}
-                </div>
-                <div>
-                    <div @click="modifyUsername" style="cursor: pointer;color: blue;">{{ currUser.name }}({{
-                            currUser.id
-                        }})(您)
+            <el-aside width="300px">
+                <div class="chat-user-list">
+                    <div>
+                        在线人数:{{ otherUsers.length + 1 }}
+                    </div>
+                    <div>
+                        <div style="cursor: pointer;color: blue;" @click="modifyUsername">{{
+                                currUser.name
+                            }}({{ currUser.id }})(您)
+                        </div>
+                        <video v-if="streamMap[currUser.id]" v-for="(stream, index) in streamMap[currUser.id]"
+                               autoplay muted :srcObject="stream" :id="stream.id"></video>
+                        <button v-if="streamMap[currUser.id]&&streamMap[currUser.id].some(s=>s.label==='UserMedia')"
+                                @click="closeCamera">关闭摄像头
+                        </button>
                     </div>
                     <div v-for="(user, index) in otherUsers">
                         <div>{{ user.name }}({{ user.id }})</div>
-                        <div v-if="streamMap[user.id]" v-for="(item, index) in streamMap[user.id]"
-                             style="border: 1px solid black;">
-                            <video autoplay muted :srcObject="item.stream" :id="item.stream.id" ref="videos"></video>
+                        <div v-if="streamMap[user.id]" v-for="(stream, index) in streamMap[user.id]">
+                            <video autoplay muted :srcObject="stream" :id="stream.id"></video>
                         </div>
                     </div>
                 </div>
@@ -401,5 +440,9 @@ group.start().then(() => {
     color: #ff0000;
     cursor: pointer;
     padding: 0 0 0 8px;
+}
+
+.chat-user-list video {
+    width: 100%;
 }
 </style>

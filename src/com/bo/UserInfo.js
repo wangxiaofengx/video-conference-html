@@ -29,7 +29,7 @@ class UserInfo {
         this._dataChannel = null;
         this._fileChannel = null;
         this._eventListener = {
-            streams: [], removeStreams: [], messages: [], connect: [], close: []
+            streams: [], closeStreams: [], messages: [], connect: [], close: []
         };
         this._remoteStreams = [];
         this._streamType = {};
@@ -61,6 +61,11 @@ class UserInfo {
 
     onStream(listener) {
         this._eventListener.streams.push(listener);
+        return this;
+    }
+
+    onCloseStream(listener) {
+        this._eventListener.closeStreams.push(listener);
         return this;
     }
 
@@ -238,10 +243,7 @@ class UserInfo {
         connect.onicecandidate = async (event) => {
             if (event.candidate) {
                 const candidate = {
-                    type: 'candidate',
-                    label: event.candidate.sdpMLineIndex,
-                    id: event.candidate.sdpMid,
-                    candidate: event.candidate.candidate
+                    type: 'candidate', label: event.candidate.sdpMLineIndex, id: event.candidate.sdpMid, candidate: event.candidate.candidate
                 }
                 let message = new Message();
                 message.setType('rtc');
@@ -292,17 +294,35 @@ class UserInfo {
                     break;
             }
         }
+
         connect.ontrack = (event) => {
             event.streams.forEach(stream => {
-                stream.addEventListener('removetrack', (e) => {
-                    const tracks = stream.getTracks();
-                    if (tracks.length === 0) {
-                        delete that._streamType[stream.id];
-                    }
-                })
-                that._eventListener.streams.forEach(listener => {
-                    listener(stream, that._streamType[stream.id]);
-                });
+                let find = that._remoteStreams.find(s => s.id === stream.id);
+                if (!find) {
+                    find = stream;
+                    that._remoteStreams.push(stream);
+                    const streamType = that._streamType[stream.id];
+                    stream.addEventListener('removetrack', (e) => {
+                        const tracks = stream.getTracks();
+                        if (tracks.length === 0) {
+                            delete that._streamType[stream.id];
+                            const index = that._remoteStreams.findIndex(s => s.id === stream.id);
+                            if (index !== -1) {
+                                that._remoteStreams.splice(index, 1);
+                            }
+                            that._eventListener.closeStreams.forEach(listener => {
+                                listener(stream, streamType);
+                            });
+                        }
+                    })
+                    that._eventListener.streams.forEach(listener => {
+                        listener(stream, streamType);
+                    });
+                }
+                const tracks = find.getTracks();
+                if (!tracks.some(s => s.id === event.track.id)) {
+                    find.addTrack(event.track);
+                }
             });
         }
         return connect;
