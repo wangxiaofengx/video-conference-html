@@ -237,8 +237,16 @@ const sharedScreen = async () => {
     await group.addStream(stream, type)
 }
 
-const closeScreen = () => {
-
+const closeScreen = async () => {
+    const id = group.getCurrentUser().getId();
+    const streams = streamMap.value[id];
+    if (!streams) {
+        return;
+    }
+    const type = 'DisplayMedia'
+    const stream = streams.find(stream => stream.label === type);
+    onCloseStream(stream, group.getCurrentUser(), type)
+    await group.removeStream(stream)
 }
 
 group.onStream(onStream);
@@ -340,9 +348,12 @@ group.start().then(() => {
                         </div>
                         <video v-if="streamMap[currUser.id]" v-for="(stream, index) in streamMap[currUser.id]"
                                autoplay muted :srcObject="stream" :id="stream.id"></video>
-                        <button v-if="streamMap[currUser.id]&&streamMap[currUser.id].some(s=>s.label==='UserMedia')"
+                        <el-button v-if="streamMap[currUser.id]&&streamMap[currUser.id].some(s=>s.label==='UserMedia')"
                                 @click="closeCamera">关闭摄像头
-                        </button>
+                        </el-button>
+                        <el-button v-if="streamMap[currUser.id]&&streamMap[currUser.id].some(s=>s.label==='DisplayMedia')"
+                                @click="closeCamera">关闭屏幕共享
+                        </el-button>
                     </div>
                     <div v-for="(user, index) in otherUsers">
                         <div>{{ user.name }}({{ user.id }})</div>
