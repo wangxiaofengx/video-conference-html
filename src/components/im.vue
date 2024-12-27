@@ -346,19 +346,16 @@ group.start().then(() => {
                                 currUser.name
                             }}({{ currUser.id }})(您)
                         </div>
-                        <video v-if="streamMap[currUser.id]" v-for="(stream, index) in streamMap[currUser.id]"
-                               autoplay muted :srcObject="stream" :id="stream.id"></video>
-                        <el-button v-if="streamMap[currUser.id]&&streamMap[currUser.id].some(s=>s.label==='UserMedia')"
-                                @click="closeCamera">关闭摄像头
-                        </el-button>
-                        <el-button v-if="streamMap[currUser.id]&&streamMap[currUser.id].some(s=>s.label==='DisplayMedia')"
-                                @click="closeCamera">关闭屏幕共享
-                        </el-button>
+                        <div v-if="streamMap[currUser.id]" v-for="(stream, index) in streamMap[currUser.id]">
+                            <video autoplay muted controls :srcObject="stream" :id="stream.id"></video>
+                            <el-button v-if="stream.label==='UserMedia'" @click="closeCamera">关闭摄像头</el-button>
+                            <el-button v-if="stream.label==='DisplayMedia'" @click="closeScreen">关闭屏幕共享</el-button>
+                        </div>
                     </div>
                     <div v-for="(user, index) in otherUsers">
                         <div>{{ user.name }}({{ user.id }})</div>
                         <div v-if="streamMap[user.id]" v-for="(stream, index) in streamMap[user.id]">
-                            <video autoplay muted :srcObject="stream" :id="stream.id"></video>
+                            <video autoplay muted controls :srcObject="stream" :id="stream.id"></video>
                         </div>
                     </div>
                 </div>
