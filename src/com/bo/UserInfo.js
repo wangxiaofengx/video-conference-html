@@ -7,6 +7,7 @@ class UserInfo {
     static fileChannelName = 'sendFileChannel';
     static dataChannelName = 'sendDataChannel';
     static imageChannelName = 'sendImageChannel';
+    static _sendFiles = {}
 
     constructor(options) {
         this.dispose();
@@ -36,7 +37,6 @@ class UserInfo {
         this._localStream = [];
         this._socket = null;
         this._connectComplete = false;
-        this._sendFiles = {};
         this._downFile = null;
         this._downImage = null;
         this._downImageQueue = [];
@@ -219,25 +219,6 @@ class UserInfo {
 
     createConnection() {
         const that = this;
-        // const config = {
-        //     "iceServers": [{
-        //         "url": "stun:" + location.hostname
-        //     }, {
-        //         "url": "turn:" + location.hostname, username: "olddriver", credential: "olddriver"
-        //     }]
-        // }
-        // const config = {
-        //     iceServers: [{
-        //         urls: "stun:stun.l.google.com:19302"
-        //     }]
-        // };
-        // const config = {
-        //     iceServers: [{
-        //         urls: ["stun:stun.fitauto.ru:3478", "stun:stun.pure-ip.com:3478"]
-        //
-        //     }]
-        // };
-
         const config = {iceServers: [{urls: this._iceServers.map(url => "stun:" + url)}]};
         const connect = new RTCPeerConnection(config);
         connect.onicecandidate = async (event) => {
@@ -380,7 +361,7 @@ class UserInfo {
         const message = new Message();
         message.setType('file');
         message.setData({uid: file.uid, name: file.name, size: file.size, type: file.type});
-        this._sendFiles[file.uid] = file;
+        UserInfo._sendFiles[file.uid] = file;
         return await this.sendMessage(message);
     }
 
@@ -423,7 +404,7 @@ class UserInfo {
 
     async transferFile(message) {
         const data = message.getData();
-        const file = this._sendFiles[data.uid];
+        const file = UserInfo._sendFiles[data.uid];
         let fileChannel = this.getFileChannel();
         return await this.sendFileChunk(fileChannel, file);
     }

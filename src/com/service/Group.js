@@ -16,7 +16,6 @@ class Group {
     start() {
         return new Promise((resolve, reject) => {
             const url = (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + '/video/conference/websocket/' + this.channel;
-            // const url = 'https://d28c4rauq8y8l3.cloudfront.net/video/conference/websocket/' + this.channel;
             const socket = this._socket = new WebSocket(url);
 
             socket.on = function (name, callback) {

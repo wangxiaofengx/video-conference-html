@@ -283,7 +283,7 @@ Message.list().then(data => {
             <el-main>
                 <div class="chat-box">
                     <div v-for="(message, index) in messages" :key="index" class="chat-detail">
-                        <div v-if="message.type==='system'" class="chat-type-system text-center">
+                        <div v-if="message.type==='system'||message.type==='system-welcome'" class="chat-type-system text-center">
                             {{ message.data }}
                         </div>
                         <div v-else class="chat-type-user" :class="message.isSelf?'text-right':'text-left'">
