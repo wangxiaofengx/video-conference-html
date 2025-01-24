@@ -21,7 +21,7 @@ group.onJoin((userInfo) => {
     const message = new Message({
         sender: group.getCurrentUser().getId(),
         data: userInfo.name + ' 进入了房间',
-        type: 'system'
+        type: 'system-welcome',
     });
     onMessage(message)
 })
@@ -33,7 +33,7 @@ group.onLeave((userInfo) => {
     const message = new Message({
         sender: group.getCurrentUser().getId(),
         data: userInfo.name + ' 离开了房间',
-        type: 'system'
+        type: 'system-welcome'
     });
     onMessage(message)
 
@@ -48,8 +48,12 @@ group.onLeave((userInfo) => {
 })
 group.onClose(() => {
     ElMessage.error('连接已断开')
+    const currentUser = group.getCurrentUser();
+    if (!currentUser) {
+        return;
+    }
     const message = new Message({
-        sender: group.getCurrentUser().getId(),
+        sender: currentUser.getId(),
         data: '系统检测到连接已断开，请手动刷新页面尝试获取用户',
         type: 'system'
     });
@@ -61,6 +65,9 @@ const onMessage = (message) => {
     message.isSelf = isSelf;
     message.username = isSelf ? group.getCurrentUser().getName() : group.getUserInfo(message.getSender()).getName()
     showMessage(message)
+    if (message.isSystem()) {
+        return;
+    }
     message.save();
 }
 
