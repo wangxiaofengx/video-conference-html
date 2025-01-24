@@ -60,8 +60,12 @@ const onMessage = (message) => {
     let isSelf = message.getSender() === group.getCurrentUser().getId();
     message.isSelf = isSelf;
     message.username = isSelf ? group.getCurrentUser().getName() : group.getUserInfo(message.getSender()).getName()
-    messages.value.push(message);
+    showMessage(message)
+    message.save();
+}
 
+const showMessage = (message) => {
+    messages.value.push(message);
     const delay = message.getType() === 'image' ? setTimeout : nextTick;
     delay(() => {
         let charBox = document.getElementsByClassName('chat-box')[0];
@@ -258,6 +262,12 @@ group.start().then(() => {
 }).catch((e) => {
     ElMessage.error('建立连接失败:' + e)
 });
+Message.list().then(data => {
+    for (let i = data.length; i > 0; i--) {
+        const message = data[i - 1];
+        showMessage(message)
+    }
+})
 </script>
 
 <template>
