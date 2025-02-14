@@ -3,6 +3,7 @@ import {ref, nextTick} from 'vue'
 import {ElMessage} from 'element-plus'
 import Group from "../com/service/Group";
 import Message from "../com/bo/Message";
+import { Document, Download, Picture, VideoCamera, Monitor } from '@element-plus/icons-vue'
 
 const currUser = ref({});
 const group = new Group('im');
@@ -260,6 +261,27 @@ const closeScreen = async () => {
     await group.removeStream(stream)
 }
 
+const handleKeydown = (e) => {
+    if ((e.shiftKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        const text = sendText.value;
+        sendText.value = text.substring(0, start) + '\n' + text.substring(end);
+        nextTick(() => {
+            e.target.selectionStart = e.target.selectionEnd = start + 1;
+        });
+        return;
+    }
+    
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        if (sendText.value.trim()) {
+            sendMessage();
+        }
+    }
+};
+
 group.onStream(onStream);
 group.onCloseStream(onCloseStream);
 group.onMessage(onMessage);
@@ -279,10 +301,51 @@ Message.list().then(data => {
 
 <template>
     <div class="common-layout">
-        <el-container>
-            <el-main>
-                <div class="chat-box">
-                    <div v-for="(message, index) in messages" :key="index" class="chat-detail">
+        <el-container class="chat-container">
+            <el-aside width="280px" class="user-sidebar">
+                <div class="sidebar-header">
+                    <h3>在线用户 ({{ otherUsers.length + 1 }})</h3>
+                </div>
+                <div class="user-list">
+                    <div class="current-user">
+                        <div class="user-info" @click="modifyUsername">
+                            <el-avatar :size="40">{{ currUser.name?.[0] }}</el-avatar>
+                            <div class="user-detail">
+                                <div class="username">{{ currUser.name }} <span class="user-tag">您</span></div>
+                                <div class="user-id">ID: {{ currUser.id }}</div>
+                            </div>
+                        </div>
+                        <div v-if="streamMap[currUser.id]" class="stream-container">
+                            <div v-for="stream in streamMap[currUser.id]" :key="stream.id" class="stream-item">
+                                <video autoplay muted controls :srcObject="stream" :id="stream.id"></video>
+                                <el-button size="small" type="danger" plain
+                                    @click="stream.label === 'UserMedia' ? closeCamera() : closeScreen()">
+                                    关闭{{ stream.label === 'UserMedia' ? '摄像头' : '屏幕共享' }}
+                                </el-button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-for="user in otherUsers" :key="user.id" class="other-user">
+                        <div class="user-info">
+                            <el-avatar :size="40">{{ user.name?.[0] }}</el-avatar>
+                            <div class="user-detail">
+                                <div class="username">{{ user.name }}</div>
+                                <div class="user-id">ID: {{ user.id }}</div>
+                            </div>
+                        </div>
+                        <div v-if="streamMap[user.id]" class="stream-container">
+                            <div v-for="stream in streamMap[user.id]" :key="stream.id" class="stream-item">
+                                <video autoplay controls :srcObject="stream" :id="stream.id"></video>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </el-aside>
+
+            <el-main class="chat-main">
+                <div class="chat-box custom-scrollbar">
+                    <div v-for="(message, index) in messages" :key="index" class="chat-detail" :class="{'system-message': message.isSystem()}">
                         <div v-if="message.type==='system'||message.type==='system-welcome'" class="chat-type-system text-center">
                             {{ message.data }}
                         </div>
@@ -291,98 +354,277 @@ Message.list().then(data => {
                                 {{ message.username }}
                                 {{ message.timestamp }}
                             </p>
-                            <p v-if="message.type==='text'" class="chat-data">
-                                {{ message.data }}
-                            </p>
-                            <p v-else-if="message.type==='file'" class="chat-data">
-                                <span class="file-name">{{ message.data.name }}</span>
-                                <span class="file-size">
-                                {{ (message.data.size / 1024 / 1024).toFixed(2) }}MB
-                            </span>
-                                <span v-if="!message.isSelf">
-                                <span class="file-download"
-                                      @click="downloadFile(message)">下载</span>
-                                <span class="file-download-process">{{ message.data.progress }}</span>
-                                <span v-if="message.data.status==='downloading'" class="file-download-cancel"
+                            <div class="chat-data" :class="{'chat-file': message.type === 'file'}">
+                                <template v-if="message.type === 'file'">
+                                    <div class="file-name">{{ message.data.name }}</div>
+                                    <div class="file-size">{{ (message.data.size / 1024 / 1024).toFixed(2) }}MB</div>
+                                    <div class="file-download" @click="downloadFile(message)">
+                                        下载
+                                        <span class="download-status">
+                                            {{ message.data.progress }}
+                                        </span>
+                                        <span v-if="message.data.status==='downloading'" class="file-download-cancel"
                                       @click="downloadFileCancel(message)">取消下载</span>
-                            </span>
-                            </p>
-                            <p v-else-if="message.type==='image'" class="chat-image">
-                                <el-image
-                                    style="width: 400px; height: auto"
-                                    :src="message.data"
-                                    :hide-on-click-modal="true"
-                                    :preview-src-list="[message.data]"
-                                    fit="cover"
-                                />
-                            </p>
-                            <p v-else class="chat-data">
-                                {{ message }}
-                            </p>
+                                    </div>
+                                </template>
+                                <p v-else-if="message.type==='text'">
+                                    {{ message.data }}
+                                </p>
+                                <p v-else-if="message.type==='image'" class="chat-image">
+                                    <el-image
+                                        style="width: 400px; height: auto"
+                                        :src="message.data"
+                                        :hide-on-click-modal="true"
+                                        :preview-src-list="[message.data]"
+                                        fit="cover"
+                                    />
+                                </p>
+                                <p v-else>
+                                    {{ message }}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div>
-                    <el-upload
-                        ref="uploadFile"
-                        :show-file-list="false"
-                        multiple
-                        :auto-upload="false"
-                        :on-change="selectFile"
-                        style="display: inline"
-                    >
-                        <el-button>文件</el-button>
-                    </el-upload>
+                <div class="toolbar">
+                    <div class="button-group">
+                        <el-tooltip content="发送文件" placement="top">
+                            <el-upload ref="uploadFile" 
+                                      :show-file-list="false" 
+                                      :auto-upload="false" 
+                                      :on-change="selectFile">
+                                <el-button type="primary" plain>
+                                    <el-icon><Document /></el-icon>
+                                </el-button>
+                            </el-upload>
+                        </el-tooltip>
 
-                    <el-upload
-                        ref="uploadImage"
-                        :show-file-list="false"
-                        multiple
-                        :auto-upload="false"
-                        accept="image/*"
-                        :on-change="selectImage"
-                        style="display: inline"
-                    >
-                        <el-button>图片</el-button>
-                    </el-upload>
-                    <el-button @click="openCamera">语音视频</el-button>
-                    <el-button @click="sharedScreen">屏幕共享</el-button>
+                        <el-tooltip content="发送图片" placement="top">
+                            <el-upload ref="uploadImage" 
+                                      :show-file-list="false" 
+                                      accept="image/*" 
+                                      :auto-upload="false" 
+                                      :on-change="selectImage">
+                                <el-button type="primary" plain>
+                                    <el-icon><Picture /></el-icon>
+                                </el-button>
+                            </el-upload>
+                        </el-tooltip>
+
+                        <el-tooltip content="语音视频通话" placement="top">
+                            <el-button type="primary" plain @click="openCamera">
+                                <el-icon><VideoCamera /></el-icon>
+                            </el-button>
+                        </el-tooltip>
+
+                        <el-tooltip content="屏幕共享" placement="top">
+                            <el-button type="primary" plain @click="sharedScreen">
+                                <el-icon><Monitor /></el-icon>
+                            </el-button>
+                        </el-tooltip>
+                    </div>
                 </div>
-                <div>
-                    <el-input v-model="sendText" class="send-text" @keydown.enter="sendMessage"></el-input>
-                    <el-button @click="sendMessage">发送</el-button>
+                <div class="message-input">
+                    <el-input v-model="sendText"
+                              type="textarea"
+                              :rows="3"
+                              class="send-text"
+                              resize="none"
+                              placeholder="按 Enter 发送消息，Shift + Enter 或 Ctrl + Enter 换行..."
+                              @keydown="handleKeydown">
+                    </el-input>
                 </div>
             </el-main>
-            <el-aside width="300px">
-                <div class="chat-user-list">
-                    <div>
-                        在线人数:{{ otherUsers.length + 1 }}
-                    </div>
-                    <div>
-                        <div style="cursor: pointer;color: blue;" @click="modifyUsername">{{
-                                currUser.name
-                            }}({{ currUser.id }})(您)
-                        </div>
-                        <div v-if="streamMap[currUser.id]" v-for="(stream, index) in streamMap[currUser.id]">
-                            <video autoplay muted controls :srcObject="stream" :id="stream.id"></video>
-                            <el-button v-if="stream.label==='UserMedia'" @click="closeCamera">关闭摄像头</el-button>
-                            <el-button v-if="stream.label==='DisplayMedia'" @click="closeScreen">关闭屏幕共享</el-button>
-                        </div>
-                    </div>
-                    <div v-for="(user, index) in otherUsers">
-                        <div>{{ user.name }}({{ user.id }})</div>
-                        <div v-if="streamMap[user.id]" v-for="(stream, index) in streamMap[user.id]">
-                            <video autoplay muted controls :srcObject="stream" :id="stream.id"></video>
-                        </div>
-                    </div>
-                </div>
-            </el-aside>
         </el-container>
     </div>
 </template>
 
 <style scoped lang="scss">
+.chat-container {
+    height: 100vh;
+    background-color: #f5f7fa;
+}
 
+.user-sidebar {
+    background: white;
+    border-right: 1px solid #e6e6e6;
+    display: flex;
+    flex-direction: column;
+    
+    .sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid #e6e6e6;
+        
+        h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+        }
+    }
+    
+    .user-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+    }
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 8px;
+    
+    &:hover {
+        background-color: #f5f7fa;
+    }
+    
+    .user-detail {
+        margin-left: 12px;
+        
+        .username {
+            font-size: 14px;
+            font-weight: 500;
+            
+            .user-tag {
+                background: #409EFF;
+                color: white;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 12px;
+                margin-left: 4px;
+            }
+        }
+        
+        .user-id {
+            font-size: 12px;
+            color: #999;
+            margin-top: 2px;
+        }
+    }
+}
+
+.stream-container {
+    margin-top: 8px;
+    
+    .stream-item {
+        margin-bottom: 12px;
+        
+        video {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+        }
+        
+        .el-button {
+            margin-top: 8px;
+            width: 100%;
+        }
+    }
+}
+
+.custom-scrollbar {
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 3px;
+    }
+    
+    &::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+}
+
+.chat-main {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.chat-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: #f5f7fa;
+}
+
+.chat-type-user {
+    margin: 10px 0;
+    display: flex;
+    flex-direction: column;
+    
+    &.text-right {
+        align-items: flex-end;
+
+        .chat-data {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+    }
+
+    &.text-left {
+        align-items: flex-start;
+
+        .chat-data {
+            background-color: #f5f5f5;
+            color: #424242;
+        }
+    }
+}
+
+.chat-data {
+    padding: 8px 12px;
+    border-radius: 8px;
+    max-width: 80%;
+    word-break: break-all;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.chat-image {
+    img {
+        border-radius: 8px;
+        box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    }
+}
+
+.toolbar {
+    padding: 12px;
+    border-top: 1px solid #e6e6e6;
+    background: white;
+    
+    .button-group {
+        display: flex;
+        gap: 8px;
+    }
+}
+
+.message-input {
+    padding: 12px;
+    background: white;
+    
+    .send-text {
+        width: 100%;
+    }
+}
+
+.chat-type-system {
+    margin: 10px 0;
+    padding: 5px 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.file-download, .file-download-cancel {
+    &:hover {
+        text-decoration: underline;
+    }
+}
 
 .text-left {
     text-align: left;
@@ -394,41 +636,6 @@ Message.list().then(data => {
 
 .text-center {
     text-align: center;
-}
-
-.chat-box {
-    overflow: auto;
-    overflow-anchor: none;
-    scroll-behavior: smooth;
-    height: 800px;
-    border: 1px solid #00000026;
-}
-
-.send-text {
-    width: 100%
-}
-
-.chat-box .chat-type-user {
-    padding: 5px;
-}
-
-.chat-box .chat-type-system {
-    color: #666666;
-    font-size: 12px;
-    font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
-}
-
-.chat-box .chat-type-user:nth-of-type(odd) {
-    background-color: #f2f2f2;
-}
-
-.chat-box .chat-type-user:nth-of-type(even) {
-    background-color: #ffffff;
-}
-
-.chat-box .chat-type-user:hover {
-    background-color: #cccccc;
-    //cursor: pointer;
 }
 
 .chat-box .chat-user {
