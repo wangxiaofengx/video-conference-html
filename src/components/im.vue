@@ -280,7 +280,15 @@ const handleKeydown = (e) => {
             sendMessage();
         }
     }
-};
+}
+
+const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+}
 
 group.onStream(onStream);
 group.onCloseStream(onCloseStream);
@@ -297,6 +305,7 @@ Message.list().then(data => {
         showMessage(message)
     }
 })
+
 </script>
 
 <template>
@@ -354,17 +363,33 @@ Message.list().then(data => {
                                 {{ message.username }}
                                 {{ message.timestamp }}
                             </p>
-                            <div class="chat-data" :class="{'chat-file': message.type === 'file'}">
+                            <div class="chat-data">
                                 <template v-if="message.type === 'file'">
-                                    <div class="file-name">{{ message.data.name }}</div>
-                                    <div class="file-size">{{ (message.data.size / 1024 / 1024).toFixed(2) }}MB</div>
-                                    <div class="file-download" @click="downloadFile(message)" v-if="!message.isSelf">
-                                        下载
-                                        <span class="download-status">
-                                            {{ message.data.progress }}
-                                        </span>
+                                    <div class="file-content">
+                                        <div class="file-header">
+                                            <el-icon><Document /></el-icon>
+                                            <div class="file-name" :title="message.data.name">{{ message.data.name }}</div>
+                                        </div>
+                                        <div class="file-info">
+                                            <span class="file-size">{{ formatFileSize(message.data.size) }}</span>
+                                            <template v-if="!message.isSelf">
+                                                <template v-if="message.data.status === 'downloading'">
+                                                    <div class="download-progress">
+                                                        <span class="progress-text">{{ message.data.progress }}</span>
+                                                        <el-button type="danger" link size="small" @click="downloadFileCancel(message)">
+                                                            取消下载
+                                                        </el-button>
+                                                    </div>
+                                                </template>
+                                                <template v-else>
+                                                    <el-button type="primary" link size="small" @click="downloadFile(message)">
+                                                        <el-icon><Download /></el-icon>
+                                                        下载
+                                                    </el-button>
+                                                </template>
+                                            </template>
+                                        </div>
                                     </div>
-                                    <div v-if="message.data.status==='downloading'" class="file-download-cancel" @click="downloadFileCancel(message)">取消下载</div>
                                 </template>
                                 <p v-else-if="message.type==='text'">
                                     {{ message.data }}
