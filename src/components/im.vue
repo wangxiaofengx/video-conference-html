@@ -358,14 +358,13 @@ Message.list().then(data => {
                                 <template v-if="message.type === 'file'">
                                     <div class="file-name">{{ message.data.name }}</div>
                                     <div class="file-size">{{ (message.data.size / 1024 / 1024).toFixed(2) }}MB</div>
-                                    <div class="file-download" @click="downloadFile(message)">
+                                    <div class="file-download" @click="downloadFile(message)" v-if="!message.isSelf">
                                         下载
                                         <span class="download-status">
                                             {{ message.data.progress }}
                                         </span>
-                                        <span v-if="message.data.status==='downloading'" class="file-download-cancel"
-                                      @click="downloadFileCancel(message)">取消下载</span>
                                     </div>
+                                    <div v-if="message.data.status==='downloading'" class="file-download-cancel" @click="downloadFileCancel(message)">取消下载</div>
                                 </template>
                                 <p v-else-if="message.type==='text'">
                                     {{ message.data }}
@@ -389,7 +388,8 @@ Message.list().then(data => {
                 <div class="toolbar">
                     <div class="button-group">
                         <el-tooltip content="发送文件" placement="top">
-                            <el-upload ref="uploadFile" 
+                            <el-upload ref="uploadFile"
+                                       multiple
                                       :show-file-list="false" 
                                       :auto-upload="false" 
                                       :on-change="selectFile">
@@ -400,9 +400,11 @@ Message.list().then(data => {
                         </el-tooltip>
 
                         <el-tooltip content="发送图片" placement="top">
-                            <el-upload ref="uploadImage" 
+                            <el-upload ref="uploadImage"
+                                       multiple
                                       :show-file-list="false" 
-                                      accept="image/*" 
+                                      accept="image/*"
+
                                       :auto-upload="false" 
                                       :on-change="selectImage">
                                 <el-button type="primary" plain>
